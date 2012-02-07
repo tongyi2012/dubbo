@@ -1,0 +1,7 @@
+com.alibaba.dubbo.registry.support.RegistryProtocol
+com.alibaba.dubbo.rpc.protocol.ProtocolFilterWrapper
+com.alibaba.dubbo.rpc.protocol.ProtocolListenerWrapper
+com.alibaba.dubbo.rpc.protocol.dubbo.DubboProtocol
+com.alibaba.dubbo.rpc.protocol.injvm.InjvmProtocol
+com.alibaba.dubbo.rpc.protocol.rmi.RmiProtocol
+com.alibaba.dubbo.rpc.protocol.hessian.HessianProtocol

@@ -1,0 +1,4 @@
+com.alibaba.dubbo.rpc.protocol.dubbo.DubboCodec
+com.alibaba.dubbo.remoting.transport.codec.TransportCodec
+com.alibaba.dubbo.remoting.telnet.codec.TelnetCodec
+com.alibaba.dubbo.remoting.exchange.codec.ExchangeCodec
