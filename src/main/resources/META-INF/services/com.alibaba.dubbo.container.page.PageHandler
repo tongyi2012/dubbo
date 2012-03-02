@@ -1,0 +1,9 @@
+com.alibaba.dubbo.registry.pages.RegistriesPageHandler
+com.alibaba.dubbo.registry.pages.RegisteredPageHandler
+com.alibaba.dubbo.registry.pages.SubscribedPageHandler
+com.alibaba.dubbo.container.page.pages.HomePageHandler
+com.alibaba.dubbo.container.page.pages.StatusPageHandler
+com.alibaba.dubbo.container.page.pages.LogPageHandler
+com.alibaba.dubbo.container.page.pages.SystemPageHandler
+com.alibaba.dubbo.rpc.protocol.dubbo.page.ServersPageHandler
+com.alibaba.dubbo.rpc.protocol.dubbo.page.ClientsPageHandler
