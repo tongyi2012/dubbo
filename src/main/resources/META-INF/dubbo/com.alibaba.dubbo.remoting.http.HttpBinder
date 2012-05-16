@@ -1,0 +1,5 @@
+servlet=com.alibaba.dubbo.remoting.http.servlet.ServletHttpBinder
+jetty=com.alibaba.dubbo.remoting.http.jetty.JettyHttpBinder
+
+servlet=com.alibaba.dubbo.remoting.http.servlet.ServletHttpBinder
+jetty=com.alibaba.dubbo.remoting.http.jetty.JettyHttpBinder
