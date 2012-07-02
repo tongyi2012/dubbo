@@ -44,6 +44,7 @@ import com.alibaba.dubbo.rpc.Exporter;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
 import com.alibaba.dubbo.rpc.ProxyFactory;
+import com.alibaba.dubbo.rpc.cluster.ConfiguratorFactory;
 import com.alibaba.dubbo.rpc.service.GenericService;
 
 /**
@@ -59,6 +60,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     private static final Protocol protocol = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();
     
     private static final ProxyFactory proxyFactory = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();
+
+    private static final Map<String, Integer> RANDOM_PORT_MAP = new HashMap<String, Integer>();
 
     // 接口类型
     private String              interfaceName;
@@ -314,7 +317,11 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 port = ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(name).getDefaultPort();
             }
             if (port == null || port <= 0) {
-                port = NetUtils.getAvailablePort();
+                port = getRandomPort(name);
+                if (port == null || port < 0) {
+                    port = NetUtils.getAvailablePort();
+                    putRandomPort(name, port);
+                }
                 logger.warn("Use random available port(" + port + ") for protocol " + name);
             }
             Map<String, String> map = new HashMap<String, String>();
@@ -408,16 +415,18 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 protocolConfig.setRegister(false);
                 map.put("notify", "false");
             }
-            // ugly hack
-            if ("napoli".equals(protocolConfig.getName())) {
-                map.put(Constants.ASYNC_KEY, Boolean.TRUE.toString());
-            }
             // 导出服务
             String contextPath = protocolConfig.getContextpath();
             if ((contextPath == null || contextPath.length() == 0) && provider != null) {
                 contextPath = provider.getContextpath();
             }
             URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
+            
+            if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
+                .hasExtension(url.getProtocol())) {
+                url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
+                    .getExtension(url.getProtocol()).getConfigurator(url).configure(url);
+            }
             
             String scope = url.getParameter(Constants.SCOPE_KEY);
             //配置为none不暴露
@@ -488,6 +497,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             setProtocol(new ProtocolConfig());
         }
         for (ProtocolConfig protocolConfig : protocols) {
+            if (StringUtils.isEmpty(protocolConfig.getName())) {
+                protocolConfig.setName("dubbo");
+            }
             appendProperties(protocolConfig);
         }
     }
@@ -651,4 +663,18 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         return provider;
     }
 
+    private static Integer getRandomPort(String protocol) {
+        protocol = protocol.toLowerCase();
+        if (RANDOM_PORT_MAP.containsKey(protocol)) {
+            return RANDOM_PORT_MAP.get(protocol);
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private static void putRandomPort(String protocol, Integer port) {
+        protocol = protocol.toLowerCase();
+        if (!RANDOM_PORT_MAP.containsKey(protocol)) {
+            RANDOM_PORT_MAP.put(protocol, port);
+        }
+    }
 }

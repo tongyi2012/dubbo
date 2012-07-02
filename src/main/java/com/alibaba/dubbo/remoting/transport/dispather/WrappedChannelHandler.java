@@ -29,6 +29,7 @@ import com.alibaba.dubbo.remoting.ChannelHandler;
 import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.exchange.Request;
 import com.alibaba.dubbo.remoting.exchange.Response;
+import com.alibaba.dubbo.remoting.exchange.support.header.HeaderExchangeHandler;
 import com.alibaba.dubbo.remoting.transport.ChannelHandlerDelegate;
 
 public class WrappedChannelHandler implements ChannelHandlerDelegate {
@@ -73,14 +74,6 @@ public class WrappedChannelHandler implements ChannelHandlerDelegate {
 
     @SuppressWarnings("deprecation")
     public void received(Channel channel, Object message) throws RemotingException {
-        if (message instanceof Request && ((Request)message).isHeartbeat()){
-            Request req = (Request) message;
-            if (req.isTwoWay()){
-                Response res = new Response(req.getId(),req.getVersion());
-                res.setHeartbeat(true);
-                channel.send(res);
-            }
-        }
         handler.received(channel, message);
     }
 
@@ -104,7 +97,4 @@ public class WrappedChannelHandler implements ChannelHandlerDelegate {
         return url;
     }
 
-    protected final boolean isHeartbeatResponse(Object message) {
-        return (message instanceof Response) && ((Response)message).isHeartbeat();
-    }
 }
