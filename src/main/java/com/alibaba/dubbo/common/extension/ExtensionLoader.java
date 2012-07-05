@@ -56,7 +56,6 @@ import com.alibaba.dubbo.common.utils.StringUtils;
  * @author ding.lid
  * 
  * @see Adaptive
- * @see SPI
  */
 public class ExtensionLoader<T> {
     

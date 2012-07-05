@@ -34,14 +34,24 @@ public class MessageOnlyChannelHandler extends WrappedChannelHandler {
     }
 
     public void received(Channel channel, Object message) throws RemotingException {
-        ExecutorService cexecutor = executor;
-        if (cexecutor == null || cexecutor.isShutdown()) {
-            cexecutor = SHARED_EXECUTOR;
+        //FIXME 包的依赖顺序有问题
+        if (message instanceof Request && ((Request)message).isEvent()){
+           super.received(channel, message);
+           return;
         }
-        try {
-            cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.RECEIVED, message));
-        } catch (Throwable t) {
-            throw new ExecutionException(message, channel, getClass() + " error when process received event .", t);
+
+        if (!isHeartbeatResponse(message)) {
+            ExecutorService cexecutor = executor;
+            if (cexecutor == null || cexecutor.isShutdown()) {
+                cexecutor = SHARED_EXECUTOR;
+            }
+            try {
+                cexecutor.execute(new ChannelEventRunnable(channel, handler, ChannelState.RECEIVED, message));
+            } catch (Throwable t) {
+                throw new ExecutionException(message, channel, getClass() + " error when process received event .", t);
+            }
+        } else {
+            setReadTimestamp(channel);
         }
     }
 
