@@ -33,6 +33,7 @@ import org.apache.log4j.LogManager;
 
 import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
+import com.alibaba.dubbo.container.page.Menu;
 import com.alibaba.dubbo.container.page.Page;
 import com.alibaba.dubbo.container.page.PageHandler;
 
@@ -41,6 +42,7 @@ import com.alibaba.dubbo.container.page.PageHandler;
  * 
  * @author william.liangf
  */
+@Menu(name = "Log", desc = "Show system log.", order = Integer.MAX_VALUE - 11000)
 @Extension("log")
 public class LogPageHandler implements PageHandler {
 
@@ -101,7 +103,7 @@ public class LogPageHandler implements PageHandler {
         List<String> row = new ArrayList<String>();
         row.add(content);
         rows.add(row);
-        return new Page("Home", "Log",  new String[] {(file == null ? "" : file.getName()) + ", " + size + " bytes, " + modified + ", " + level}, rows);
+        return new Page("Log", "Log",  new String[] {(file == null ? "" : file.getName()) + ", " + size + " bytes, " + modified + ", " + level}, rows);
     }
 
 }

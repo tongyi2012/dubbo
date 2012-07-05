@@ -19,12 +19,16 @@ import static com.alibaba.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.decodeIn
 import static com.alibaba.dubbo.rpc.protocol.dubbo.CallbackServiceCodec.encodeInvocationArgument;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.Version;
+import com.alibaba.dubbo.common.logger.Logger;
+import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.serialize.ObjectInput;
 import com.alibaba.dubbo.common.serialize.ObjectOutput;
 import com.alibaba.dubbo.common.utils.ReflectUtils;
@@ -44,6 +48,9 @@ import com.alibaba.dubbo.rpc.RpcResult;
  */
 @Extension(value=DubboCodec.NAME)
 public class DubboCodec extends ExchangeCodec implements Codec {
+
+    private static final Logger     logger                  = LoggerFactory.getLogger(DubboCodec.class);
+
     public static final String      NAME                    = "dubbo";
 
     private static final String     DUBBO_VERSION           = Version.getVersion(DubboCodec.class, Version.getVersion());
@@ -149,7 +156,8 @@ public class DubboCodec extends ExchangeCodec implements Codec {
     }
 
     @Override
-    protected Object decodeResponseData(Channel channel, ObjectInput in) throws IOException {
+    protected Object decodeResponseData(Channel channel, ObjectInput in, Object request) throws IOException {
+        RpcInvocation invocation = (RpcInvocation) request;
         RpcResult result = new RpcResult();
 
         byte flag = in.readByte();
@@ -158,7 +166,25 @@ public class DubboCodec extends ExchangeCodec implements Codec {
                 break;
             case RESPONSE_VALUE:
                 try {
-                    result.setResult(in.readObject());
+                    Class<?> returnType = null;
+                    Type genericType = null;
+                    try {
+                        if (channel != null && invocation != null) {
+                            String service = invocation.getAttachment(Constants.INTERFACE_KEY);
+                            if (service == null || service.length() == 0) {
+                                service = invocation.getAttachment(Constants.PATH_KEY);
+                            }
+                            if (service != null && service.length() > 0) {
+                                Class<?> cls = ReflectUtils.forName(service);
+                                Method method = cls.getMethod(invocation.getMethodName(), invocation.getParameterTypes());
+                                returnType = method.getReturnType();
+                                genericType = method.getGenericReturnType();
+                            }
+                        }
+                    } catch (Throwable t) {
+                        logger.warn(t.getMessage(), t);
+                    }
+                    result.setResult(returnType == null ? in.readObject() : (genericType == null ? in.readObject(returnType) : in.readObject(returnType, genericType)));
                 } catch (ClassNotFoundException e) {
                     throw new IOException(StringUtils.toString("Read response data failed.", e));
                 }

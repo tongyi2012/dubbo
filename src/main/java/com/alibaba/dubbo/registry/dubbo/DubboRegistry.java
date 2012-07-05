@@ -15,13 +15,7 @@
  */
 package com.alibaba.dubbo.registry.dubbo;
 
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -33,7 +27,6 @@ import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.Version;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
-import com.alibaba.dubbo.common.utils.ConcurrentHashSet;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.registry.NotifyListener;
@@ -62,10 +55,6 @@ public class DubboRegistry extends FailbackRegistry {
 
     // 客户端获取过程锁，锁定客户端实例的创建过程，防止重复的客户端
     private final ReentrantLock clientLock = new ReentrantLock();
-
-    private final Set<String> registered = new ConcurrentHashSet<String>();
-    
-    private final ConcurrentMap<String, NotifyListener> subscribed = new ConcurrentHashMap<String, NotifyListener>();
     
     private final Invoker<RegistryService> registryInvoker;
     
@@ -119,30 +108,6 @@ public class DubboRegistry extends FailbackRegistry {
         }
     }
     
-    protected final void recover() throws Exception {
-        // register
-        Set<String> recoverRegistered = new HashSet<String>(registered);
-        if (! recoverRegistered.isEmpty()) {
-            if (logger.isInfoEnabled()) {
-                logger.info("Recover register services " + recoverRegistered);
-            }
-            for (String url : recoverRegistered) {
-                register(URL.valueOf(url));
-            }
-        }
-        // subscribe
-        Map<String, NotifyListener> recoverSubscribed = new HashMap<String, NotifyListener>(subscribed);
-        if (recoverSubscribed.size() > 0) {
-            if (logger.isInfoEnabled()) {
-                logger.info("Recover subscribe services " + recoverSubscribed);
-            }
-            for (Map.Entry<String, NotifyListener> entry : recoverSubscribed.entrySet()) {
-                String url = entry.getKey();
-                subscribe(URL.valueOf(url), entry.getValue());
-            }
-        }
-    }
-
     public boolean isAvailable() {
         if (registryInvoker == null)
             return false;
@@ -161,51 +126,25 @@ public class DubboRegistry extends FailbackRegistry {
         }
         registryInvoker.destroy();
     }
-
-    public List<URL> lookup(URL url) {
-        if (url == null) {
-            throw new IllegalArgumentException("lookup url == null");
-        }
-        if (logger.isInfoEnabled()){
-            logger.info("Lookup: " + url);
-        }
-        return registryService.lookup(url);
-    }
     
-    public void register(URL url) {
-        registered.add(url.toFullString());
-        super.register(url);
-    }
-
     protected void doRegister(URL url) {
         registryService.register(url);
-    }
-
-    public void unregister(URL url) {
-        registered.remove(url.toFullString());
-        super.unregister(url);
     }
     
     protected void doUnregister(URL url) {
         registryService.unregister(url);
     }
 
-    public void subscribe(URL url, NotifyListener listener) {
-        subscribed.put(url.toFullString(), listener);
-        super.subscribe(url, listener);
-    }
-
     protected void doSubscribe(URL url, NotifyListener listener) {
         registryService.subscribe(url, listener);
     }
     
-    public void unsubscribe(URL url, NotifyListener listener) {
-        subscribed.remove(url.toFullString());
-        super.unsubscribe(url, listener);
-    }
-
     protected void doUnsubscribe(URL url, NotifyListener listener) {
         registryService.unsubscribe(url, listener);
+    }
+
+    public List<URL> lookup(URL url) {
+        return registryService.lookup(url);
     }
     
 }

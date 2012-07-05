@@ -15,6 +15,8 @@
  */
 package com.alibaba.dubbo.rpc.protocol.dubbo;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.utils.AtomicPositiveInteger;
@@ -45,8 +47,10 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
 
     private final String                version;
     
+    private final ReentrantLock     destroyLock = new ReentrantLock();
+    
     public DubboInvoker(Class<T> serviceType, URL url, ExchangeClient[] clients){
-        super(serviceType, url, new String[] {Constants.GROUP_KEY, Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});
+        super(serviceType, url, new String[] {Constants.INTERFACE_KEY, Constants.GROUP_KEY, Constants.TOKEN_KEY, Constants.TIMEOUT_KEY});
         this.clients = clients;
         // get version.
         this.version = url.getParameter(Constants.VERSION_KEY, "0.0.0");
@@ -56,7 +60,10 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
     protected Result doInvoke(final Invocation invocation) throws Throwable {
         RpcInvocation inv = null;
         final String methodName  ;
-        if(Constants.$INVOKE.equals(invocation.getMethodName()) && invocation.getArguments() !=null && invocation.getArguments().length >0 && invocation.getArguments()[0] != null){
+        if(Constants.$INVOKE.equals(invocation.getMethodName()) 
+                && invocation.getArguments() != null 
+                && invocation.getArguments().length >0 
+                && invocation.getArguments()[0] != null){
             inv = (RpcInvocation) invocation;
             //the frist argument must be real method name;
             methodName = invocation.getArguments()[0].toString();
@@ -93,9 +100,9 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
             RpcContext.getContext().setFuture(null);
             return (Result) currentClient.request(inv, timeout).get();
         } catch (TimeoutException e) {
-            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, e.getMessage(), e);
+            throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Failed to invoke remote invocation " + invocation + " to " + getUrl() + ", cause: " + e.getMessage(), e);
         } catch (RemotingException e) {
-            throw new RpcException(RpcException.NETWORK_EXCEPTION, e.getMessage(), e);
+            throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote invocation " + invocation + " to " + getUrl() + ", cause: " + e.getMessage(), e);
         }
     }
     
@@ -103,27 +110,37 @@ public class DubboInvoker<T> extends AbstractInvoker<T> {
     public boolean isAvailable() {
         if (!super.isAvailable())
             return false;
-        if (clients.length ==1){
-            return clients[0].isConnected();
-        } else {
-            for (ExchangeClient client : clients){
-                if (client.isConnected()){
-                    return true;
-                }
+        for (ExchangeClient client : clients){
+            if (client.isConnected() && !client.hasAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY)){
+                //cannot write == not Available ?
+                return true ;
             }
         }
         return false;
     }
 
     public void destroy() {
-        super.destroy();
-        for (ExchangeClient client : clients) {
-            try {
-                client.close();
-            } catch (Throwable t) {
-                logger.warn(t.getMessage(), t);
+        //防止client被关闭多次.在connect per jvm的情况下，client.close方法会调用计数器-1，当计数器小于等于0的情况下，才真正关闭
+        if (super.isDestroyed()){
+            return ;
+        } else {
+            //dubbo check ,避免多次关闭
+            destroyLock.lock();
+            try{
+                if (super.isDestroyed()){
+                    return ;
+                }
+                super.destroy();
+                for (ExchangeClient client : clients) {
+                    try {
+                        client.close();
+                    } catch (Throwable t) {
+                        logger.warn(t.getMessage(), t);
+                    }
+                }
+            }finally {
+                destroyLock.unlock();
             }
         }
     }
-    
 }

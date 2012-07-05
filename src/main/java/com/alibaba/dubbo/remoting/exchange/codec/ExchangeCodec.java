@@ -37,6 +37,7 @@ import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.remoting.Channel;
 import com.alibaba.dubbo.remoting.exchange.Request;
 import com.alibaba.dubbo.remoting.exchange.Response;
+import com.alibaba.dubbo.remoting.exchange.support.DefaultFuture;
 import com.alibaba.dubbo.remoting.telnet.codec.TelnetCodec;
 
 /**
@@ -65,7 +66,7 @@ public class ExchangeCodec extends TelnetCodec {
 
     protected static final byte     FLAG_TWOWAY        = (byte) 0x40;
 
-    protected static final byte     FLAG_HEARTBEAT     = (byte) 0x20;
+    protected static final byte     FLAG_EVENT     = (byte) 0x20;
 
     protected static final int      SERIALIZATION_MASK = 0x1f;
 
@@ -155,7 +156,9 @@ public class ExchangeCodec extends TelnetCodec {
         if( ( flag & FLAG_REQUEST ) == 0 ) {
             // decode response.
             Response res = new Response(id);
-            res.setHeartbeat( ( flag & FLAG_HEARTBEAT ) != 0 );
+            if (( flag & FLAG_EVENT ) != 0){
+                res.setEvent(Response.HEARTBEAT_EVENT);
+            }
             // get status.
             byte status = header[3];
             res.setStatus(status);
@@ -164,8 +167,10 @@ public class ExchangeCodec extends TelnetCodec {
                     Object data;
                     if (res.isHeartbeat()) {
                         data = decodeHeartbeatData(channel, in);
+                    } else if (res.isEvent()) {
+                        data = decodeEventData(channel, in);
                     } else {
-                        data = decodeResponseData(channel, in);
+                        data = decodeResponseData(channel, in, getRequestData(id));
                     }
                     res.setResult(data);
                 } catch (Throwable t) {
@@ -181,11 +186,15 @@ public class ExchangeCodec extends TelnetCodec {
             Request req = new Request(id);
             req.setVersion("2.0.0");
             req.setTwoWay( ( flag & FLAG_TWOWAY ) != 0 );
-            req.setHeartbeat( ( flag & FLAG_HEARTBEAT ) != 0 );
+            if (( flag & FLAG_EVENT ) != 0 ){
+                req.setEvent(Request.HEARTBEAT_EVENT);
+            }
             try {
                 Object data;
                 if (req.isHeartbeat()) {
                     data = decodeHeartbeatData(channel, in);
+                } else if (req.isEvent()) {
+                    data = decodeEventData(channel, in);
                 } else {
                     data = decodeRequestData(channel, in);
                 }
@@ -199,6 +208,16 @@ public class ExchangeCodec extends TelnetCodec {
         }
     }
 
+    private Object getRequestData(long id) {
+        DefaultFuture future = DefaultFuture.getFuture(id);
+        if (future == null)
+            return null;
+        Request req = future.getRequest();
+        if (req == null)
+            return null;
+        return req.getData();
+    }
+
     protected void encodeRequest(Channel channel, OutputStream os, Request req) throws IOException {
         Serialization serialization = getSerialization(channel);
         // header.
@@ -210,7 +229,7 @@ public class ExchangeCodec extends TelnetCodec {
         header[2] = (byte) (FLAG_REQUEST | serialization.getContentTypeId());
 
         if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
-        if (req.isHeartbeat()) header[2] |= FLAG_HEARTBEAT;
+        if (req.isEvent()) header[2] |= FLAG_EVENT;
 
         // set request id.
         Bytes.long2bytes(req.getId(), header, 4);
@@ -218,8 +237,8 @@ public class ExchangeCodec extends TelnetCodec {
         // encode request data.
         UnsafeByteArrayOutputStream bos = new UnsafeByteArrayOutputStream(1024);
         ObjectOutput out = serialization.serialize(channel.getUrl(), bos);
-        if (req.isHeartbeat()) {
-            encodeHeartbeatData(channel, out, req.getData());
+        if (req.isEvent()) {
+            encodeEventData(channel, out, req.getData());
         } else {
             encodeRequestData(channel, out, req.getData());
         }
@@ -242,7 +261,7 @@ public class ExchangeCodec extends TelnetCodec {
         Bytes.short2bytes(MAGIC, header);
         // set request and serialization flag.
         header[2] = serialization.getContentTypeId();
-        if (res.isHeartbeat()) header[2] |= FLAG_HEARTBEAT;
+        if (res.isHeartbeat()) header[2] |= FLAG_EVENT;
         // set response status.
         byte status = res.getStatus();
         header[3] = status;
@@ -280,6 +299,7 @@ public class ExchangeCodec extends TelnetCodec {
         return decodeRequestData(in);
     }
 
+    @Deprecated
     protected Object decodeHeartbeatData(ObjectInput in) throws IOException {
         try {
             return in.readObject();
@@ -308,9 +328,14 @@ public class ExchangeCodec extends TelnetCodec {
     protected void encodeData(ObjectOutput out, Object data) throws IOException {
         encodeRequestData(out, data);
     }
-
-    protected void encodeHeartbeatData(ObjectOutput out, Object data) throws IOException {
+    
+    private void encodeEventData(ObjectOutput out, Object data) throws IOException {
         out.writeObject(data);
+    }
+    
+    @Deprecated
+    protected void encodeHeartbeatData(ObjectOutput out, Object data) throws IOException {
+        encodeEventData(out, data);
     }
 
     protected void encodeRequestData(ObjectOutput out, Object data) throws IOException {
@@ -325,7 +350,16 @@ public class ExchangeCodec extends TelnetCodec {
     protected Object decodeData(Channel channel, ObjectInput in) throws IOException {
         return decodeRequestData(channel ,in);
     }
+    
+    private Object decodeEventData(Channel channel, ObjectInput in) throws IOException {
+        try {
+            return in.readObject();
+        } catch (ClassNotFoundException e) {
+            throw new IOException(StringUtils.toString("Read object failed.", e));
+        }
+    }
 
+    @Deprecated
     protected Object decodeHeartbeatData(Channel channel, ObjectInput in) throws IOException {
         try {
             return in.readObject();
@@ -341,12 +375,20 @@ public class ExchangeCodec extends TelnetCodec {
     protected Object decodeResponseData(Channel channel, ObjectInput in) throws IOException {
         return decodeResponseData(in);
     }
+
+    protected Object decodeResponseData(Channel channel, ObjectInput in, Object requestData) throws IOException {
+        return decodeResponseData(channel, in);
+    }
     
     @Override
     protected void encodeData(Channel channel, ObjectOutput out, Object data) throws IOException {
         encodeRequestData(channel, out, data);
     }
 
+    private void encodeEventData(Channel channel, ObjectOutput out, Object data) throws IOException {
+        encodeEventData(out, data);
+    }
+    @Deprecated
     protected void encodeHeartbeatData(Channel channel, ObjectOutput out, Object data) throws IOException {
         encodeHeartbeatData(out, data);
     }

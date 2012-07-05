@@ -17,28 +17,24 @@ package com.alibaba.dubbo.config.spring;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 
 import com.alibaba.dubbo.config.ApplicationConfig;
 import com.alibaba.dubbo.config.ConsumerConfig;
 import com.alibaba.dubbo.config.MonitorConfig;
-import com.alibaba.dubbo.config.ProtocolConfig;
 import com.alibaba.dubbo.config.ReferenceConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
-import com.alibaba.dubbo.config.ServiceConfig;
 
 /**
  * ReferenceFactoryBean
  * 
  * @author william.liangf
  */
-public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean, ApplicationContextAware, InitializingBean {
+public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean, ApplicationContextAware {
 
 	private static final long serialVersionUID = 213195494150089726L;
 	
@@ -47,16 +43,6 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
 	public void setApplicationContext(ApplicationContext applicationContext) {
 		this.applicationContext = applicationContext;
 	}
-    
-    private static boolean isEquals(String s1, String s2) {
-        if (s1 == null && s2 == null) {
-            return true;
-        }
-        if (s1 == null || s2 == null) {
-            return false;
-        }
-        return s1.equals(s2);
-    }
     
     @SuppressWarnings({ "unchecked"})
     public Object getObject() throws Exception {
@@ -112,31 +98,6 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
                 super.setMonitor(monitorConfig);
             }
         }
-        if (isInjvm() == null 
-                && (getConsumer() == null || getConsumer().isInjvm() == null)
-                && applicationContext != null) {
-            Map<String, ServiceConfig<T>> serviceConfigMap = applicationContext.getBeansOfType(ServiceConfig.class, false, false);
-            if (serviceConfigMap != null && serviceConfigMap.size() > 0) {
-                for (ServiceConfig<T> serviceConfig : serviceConfigMap.values()) {
-                    if (isEquals(serviceConfig.getInterface(), getInterface())
-                            && isEquals(serviceConfig.getVersion(), getVersion())
-                            && isEquals(serviceConfig.getGroup(), getGroup())) {
-                        List<ProtocolConfig> protocols = serviceConfig.getProtocols();
-                        if ((protocols == null || protocols.size() == 0) 
-                                && serviceConfig.getProvider() != null) {
-                            protocols = serviceConfig.getProvider().getProtocols();
-                        }
-                        for (ProtocolConfig protocol : protocols) {
-                            if ("injvm".equals(protocol.getName())) {
-                                setInjvm(true);
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
         return get();
     }
 
@@ -146,10 +107,6 @@ public class ReferenceBean<T> extends ReferenceConfig<T> implements FactoryBean,
 
     public boolean isSingleton() {
         return true;
-    }
-
-    public void afterPropertiesSet() throws Exception {
-        getObject();
     }
 
 }

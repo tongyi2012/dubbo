@@ -214,6 +214,10 @@ public class DefaultFuture implements ResponseFuture {
         return start;
     }
 
+    public static DefaultFuture getFuture(long id) {
+        return FUTURES.get(id);
+    }
+
     public static boolean hasFuture(Channel channel) {
         return CHANNELS.containsValue(channel);
     }
@@ -302,7 +306,7 @@ public class DefaultFuture implements ResponseFuture {
     }
 
     static {
-        Thread th = new Thread(new RemotingInvocationTimeoutScan(), "remoting-invocation-timeout-scan");
+        Thread th = new Thread(new RemotingInvocationTimeoutScan(), "DubboResponseTimeoutScanTimer");
         th.setDaemon(true);
         th.start();
     }

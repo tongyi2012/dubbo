@@ -80,16 +80,36 @@ public class RpcContext {
      * 
      * @return server side.
      */
+	@Deprecated
     public boolean isServerSide() {
-        return ! isClientSide();
+        return isProviderSide();
+    }
+    
+	/**
+	 * is client side.
+	 * 
+	 * @return client side.
+	 */
+    @Deprecated
+    public boolean isClientSide() {
+        return isConsumerSide();
+    }
+    
+    /**
+     * is provider side.
+     * 
+     * @return provider side.
+     */
+    public boolean isProviderSide() {
+        return ! isConsumerSide();
     }
 
     /**
-     * is client side.
+     * is consumer side.
      * 
-     * @return client side.
+     * @return consumer side.
      */
-    public boolean isClientSide() {
+    public boolean isConsumerSide() {
         Invoker<?> invoker = getInvoker();
         if (invoker == null) {
             return false;
@@ -109,7 +129,7 @@ public class RpcContext {
             host = address.getAddress().getHostAddress();
         }
         return url.getPort() == address.getPort() && 
-                NetUtils.filterLocalHost(url.getHost()).equals(NetUtils.filterLocalHost(host));
+                NetUtils.filterLocalHost(url.getIp()).equals(NetUtils.filterLocalHost(host));
     }
     
     /**
@@ -417,7 +437,7 @@ public class RpcContext {
      * @param key
      * @return
      */
-    public Object getAttachment(String key) {
+    public String getAttachment(String key) {
         return attachments.get(key);
     }
 

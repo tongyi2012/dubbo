@@ -74,7 +74,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
     // 负责人
     protected String               owner;
 
-    // 连接数限制
+    // 连接数限制,0表示共享连接，否则为该服务独享连接数
     protected Integer              connections;
     
     // 连接数限制
@@ -98,7 +98,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
     protected void checkRegistry() {
         // 兼容旧版本
         if (registries == null || registries.size() == 0) {
-            String address = getLegacyProperty("dubbo.registry.address");
+            String address = ConfigUtils.getProperty("dubbo.registry.address");
             if (address != null && address.length() > 0) {
                 registries = new ArrayList<RegistryConfig>();
                 String[] as = address.split("\\s*[|]+\\s*");
@@ -124,7 +124,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
     protected void checkApplication() {
         // 兼容旧版本
         if (application == null) {
-            String app = getLegacyProperty("dubbo.application.name");
+            String app = ConfigUtils.getProperty("dubbo.application.name");
             if (app != null && app.length() > 0) {
                 application = new ApplicationConfig();
                 application.setName(app);
@@ -136,11 +136,11 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
         }
         
         
-        String wait = getLegacyProperty(RpcConstants.SHUTDOWN_TIMEOUT_KEY);
+        String wait = ConfigUtils.getProperty(RpcConstants.SHUTDOWN_TIMEOUT_KEY);
         if (wait != null && wait.trim().length() > 0) {
             System.setProperty(RpcConstants.SHUTDOWN_TIMEOUT_KEY, wait.trim());
         } else {
-            wait = getLegacyProperty(RpcConstants.SHUTDOWN_TIMEOUT_SECONDS_KEY);
+            wait = ConfigUtils.getProperty(RpcConstants.SHUTDOWN_TIMEOUT_SECONDS_KEY);
             if (wait != null && wait.trim().length() > 0) {
                 System.setProperty(RpcConstants.SHUTDOWN_TIMEOUT_SECONDS_KEY, wait.trim());
             }
@@ -157,6 +157,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
                         throw new IllegalStateException("registry address == null");
                     }
                     Map<String, String> map = new HashMap<String, String>();
+                    appendParameters(map, application);
                     appendParameters(map, config);
                     map.put("path", RegistryService.class.getName());
                     if (! map.containsKey("protocol")) {
@@ -194,7 +195,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
                 }
             }
             return UrlUtils.parseURL(monitor.getAddress(), map);
-        } else if (ConfigUtils.isNotEmpty(monitor.getGroup()) && registryURL != null) {
+        } else if (Constants.REGISTRY_PROTOCOL.equals(monitor.getProtocol()) && registryURL != null) {
             return registryURL.setProtocol("dubbo").addParameter(Constants.PROTOCOL_KEY, "registry").addParameterAndEncoded(RpcConstants.REFER_KEY, StringUtils.toQueryString(map));
         }
         return null;
@@ -279,7 +280,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
         this.connections = connections;
     }
 
-    @Parameter(key = Constants.REFERENCE_FILTER_KEY)
+    @Parameter(key = Constants.REFERENCE_FILTER_KEY, append = true)
     public String getFilter() {
         return filter;
     }
@@ -289,7 +290,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
         this.filter = filter;
     }
 
-    @Parameter(key = Constants.INVOKER_LISTENER_KEY)
+    @Parameter(key = Constants.INVOKER_LISTENER_KEY, append = true)
     public String getListener() {
         checkMultiExtension(InvokerListener.class, "listener", listener);
         return listener;

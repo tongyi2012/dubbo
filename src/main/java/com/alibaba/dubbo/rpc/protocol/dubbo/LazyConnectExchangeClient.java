@@ -16,6 +16,7 @@
 package com.alibaba.dubbo.rpc.protocol.dubbo;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -24,6 +25,7 @@ import com.alibaba.dubbo.common.Parameters;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
+import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.remoting.ChannelHandler;
 import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.exchange.ExchangeClient;
@@ -37,7 +39,8 @@ import com.alibaba.dubbo.rpc.RpcConstants;
  * 
  * @author chao.liuc
  */
-final class LazyConnectExchangeClient implements ExchangeClient {
+@SuppressWarnings("deprecation")
+final class LazyConnectExchangeClient implements ExchangeClient{
 
     private final static Logger logger = LoggerFactory.getLogger(LazyConnectExchangeClient.class); 
 
@@ -47,13 +50,22 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     private final Lock                    connectLock = new ReentrantLock();
     //lazy connect 如果没有初始化时的连接状态
     private final boolean                 initialState ;
-
+    
+    protected final  boolean requestWithWarning;
+    
+    //当调用时warning，出现这个warning，表示程序可能存在bug.
+    static final  String REQUEST_WITH_WARNING_KEY = "lazyclient_request_with_warning";
+    
+    private AtomicLong warningcount = new AtomicLong(0);
+    
     public LazyConnectExchangeClient(URL url, ExchangeHandler requestHandler) {
         //lazy connect ,need set send.reconnect = true, to avoid channel bad status. 
         this.url = url.addParameter(Constants.SEND_RECONNECT_KEY, Boolean.TRUE.toString());
         this.requestHandler = requestHandler;
         this.initialState = url.getParameter(RpcConstants.LAZY_CONNECT_INITIAL_STATE_KEY,RpcConstants.DEFAULT_LAZY_CONNECT_INITIAL_STATE);
+        this.requestWithWarning = url.getParameter(REQUEST_WITH_WARNING_KEY, false);
     }
+    
 
     private void initClient() throws RemotingException {
         if (client != null )
@@ -72,6 +84,7 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     }
 
     public ResponseFuture request(Object request) throws RemotingException {
+        warning(request);
         initClient();
         return client.request(request);
     }
@@ -81,14 +94,31 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     }
 
     public InetSocketAddress getRemoteAddress() {
-        return client.getRemoteAddress();
+        if (client == null){
+            return InetSocketAddress.createUnresolved(url.getHost(), url.getPort());
+        } else {
+            return client.getRemoteAddress();
+        }
     }
-
     public ResponseFuture request(Object request, int timeout) throws RemotingException {
+        warning(request);
         initClient();
         return client.request(request, timeout);
     }
-
+    
+    /**
+     * 如果配置了调用warning，则每调用5000次warning一次.
+     * @param request
+     */
+    private void warning(Object request){
+        if (requestWithWarning ){
+            if (warningcount.get() % 5000 == 0){
+                logger.warn(new IllegalStateException("safe guard client , should not be called ,must have a bug."));
+            }
+            warningcount.incrementAndGet() ;
+        }
+    }
+    
     public ChannelHandler getChannelHandler() {
         checkClient();
         return client.getChannelHandler();
@@ -103,13 +133,15 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     }
 
     public InetSocketAddress getLocalAddress() {
-        checkClient();
-        return client.getLocalAddress();
+        if (client == null){
+            return InetSocketAddress.createUnresolved(NetUtils.getLocalHost(), 0);
+        } else {
+            return client.getLocalAddress();
+        }
     }
 
     public ExchangeHandler getExchangeHandler() {
-        checkClient();
-        return client.getExchangeHandler();
+        return requestHandler;
     }
 
     public void send(Object message) throws RemotingException {
@@ -155,8 +187,11 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     }
 
     public Object getAttribute(String key) {
-        checkClient();
-        return client.getAttribute(key);
+        if (client == null){
+            return null;
+        } else {
+            return client.getAttribute(key);
+        }
     }
 
     public void setAttribute(String key, Object value) {
@@ -170,8 +205,11 @@ final class LazyConnectExchangeClient implements ExchangeClient {
     }
 
     public boolean hasAttribute(String key) {
-        checkClient();
-        return client.hasAttribute(key);
+        if (client == null){
+            return false;
+        } else {
+            return client.hasAttribute(key);
+        }
     }
 
     private void checkClient() {

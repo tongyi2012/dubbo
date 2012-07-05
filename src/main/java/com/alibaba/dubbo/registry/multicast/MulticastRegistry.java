@@ -20,22 +20,31 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
+import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
+import com.alibaba.dubbo.common.utils.ConcurrentHashSet;
+import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.common.utils.StringUtils;
+import com.alibaba.dubbo.common.utils.UrlUtils;
 import com.alibaba.dubbo.registry.NotifyListener;
-import com.alibaba.dubbo.registry.support.CacheRegistry;
+import com.alibaba.dubbo.registry.support.FailbackRegistry;
 
 /**
  * MulticastRegistry
  * 
  * @author william.liangf
  */
-public class MulticastRegistry extends CacheRegistry {
+public class MulticastRegistry extends FailbackRegistry {
 
     // 日志输出
     private static final Logger logger = LoggerFactory.getLogger(MulticastRegistry.class);
@@ -51,7 +60,9 @@ public class MulticastRegistry extends CacheRegistry {
     private final InetAddress mutilcastAddress;
     
     private final MulticastSocket mutilcastSocket;
-    
+
+    private final ConcurrentMap<String, Set<String>> notified = new ConcurrentHashMap<String, Set<String>>();
+
     public MulticastRegistry(URL url) {
         super(url);
         if (! isMulticastAddress(url.getHost())) {
@@ -66,16 +77,13 @@ public class MulticastRegistry extends CacheRegistry {
                 public void run() {
                     byte[] buf = new byte[2048];
                     DatagramPacket recv = new DatagramPacket(buf, buf.length);
-                    while (true) {
+                    while (! mutilcastSocket.isClosed()) {
                         try {
                             mutilcastSocket.receive(recv);
                             String msg = new String(recv.getData()).trim();
                             int i = msg.indexOf('\n');
                             if (i > 0) {
                                 msg = msg.substring(0, i).trim();
-                            }
-                            if (logger.isInfoEnabled()) {
-                                logger.info("Receive multicast message: " + msg + " from " + recv.getSocketAddress());
                             }
                             MulticastRegistry.this.receive(msg, (InetSocketAddress) recv.getSocketAddress());
                             Arrays.fill(buf, (byte)0);
@@ -84,7 +92,7 @@ public class MulticastRegistry extends CacheRegistry {
                         }
                     }
                 }
-            }, "MulticastRegistryReceiver");
+            }, "DubboMulticastRegistryReceiver");
             thread.setDaemon(true);
             thread.start();
         } catch (IOException e) {
@@ -105,6 +113,9 @@ public class MulticastRegistry extends CacheRegistry {
     }
 
     private void receive(String msg, InetSocketAddress remoteAddress) {
+        if (logger.isInfoEnabled()) {
+            logger.info("Receive multicast message: " + msg + " from " + remoteAddress);
+        }
         if (msg.startsWith(REGISTER)) {
             URL url = URL.valueOf(msg.substring(REGISTER.length()).trim());
             registered(url);
@@ -116,7 +127,14 @@ public class MulticastRegistry extends CacheRegistry {
             List<URL> urls = lookup(url);
             if (urls != null && urls.size() > 0) {
                 for (URL u : urls) {
-                    unicast(REGISTER + " " + u.toFullString(), url.getHost());
+                    String host = remoteAddress != null && remoteAddress.getAddress() != null 
+                            ? remoteAddress.getAddress().getHostAddress() : url.getIp();
+                    if (url.getParameter("unicast", true) // 消费者的机器是否只有一个进程
+                            && ! NetUtils.getLocalHost().equals(host)) { // 同机器多进程不能用unicast单播信息，否则只会有一个进程收到信息
+                        unicast(REGISTER + " " + u.toFullString(), host);
+                    } else {
+                        broadcast(REGISTER + " " + u.toFullString());
+                    }
                 }
             }
         } else if (msg.startsWith(UNSUBSCRIBE)) {
@@ -158,24 +176,30 @@ public class MulticastRegistry extends CacheRegistry {
     }
 
     protected void doSubscribe(URL url, NotifyListener listener) {
-        url = url.setProtocol("multicast").setHost(mutilcastAddress.getHostAddress()).setPort(mutilcastSocket.getLocalPort());
+        if (! Constants.ANY_VALUE.equals(url.getServiceName())
+                && url.getParameter(Constants.REGISTER_KEY, true)) {
+            register(url);
+        }
         broadcast(SUBSCRIBE + " " + url.toFullString());
         synchronized (listener) {
             try {
-                listener.wait(5000);
+                listener.wait(url.getParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT));
             } catch (InterruptedException e) {
             }
         }
     }
 
     protected void doUnsubscribe(URL url, NotifyListener listener) {
-        url = url.setProtocol("multicast").setHost(mutilcastAddress.getHostAddress()).setPort(mutilcastSocket.getLocalPort());
+        if (! Constants.ANY_VALUE.equals(url.getServiceName())
+                && url.getParameter(Constants.REGISTER_KEY, true)) {
+            unregister(url);
+        }
         broadcast(UNSUBSCRIBE + " " + url.toFullString());
     }
 
     public boolean isAvailable() {
         try {
-            return mutilcastSocket.isConnected();
+            return mutilcastSocket != null;
         } catch (Throwable t) {
             return false;
         }
@@ -184,10 +208,95 @@ public class MulticastRegistry extends CacheRegistry {
     public void destroy() {
         super.destroy();
         try {
+            mutilcastSocket.leaveGroup(mutilcastAddress);
             mutilcastSocket.close();
         } catch (Throwable t) {
             logger.warn(t.getMessage(), t);
         }
+    }
+
+    protected void registered(URL url) {
+        for (Map.Entry<String, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
+            String key = entry.getKey();
+            URL subscribe = URL.valueOf(key);
+            if (UrlUtils.isMatch(subscribe, url)) {
+                Set<String> urls = notified.get(key);
+                if (urls == null) {
+                    notified.putIfAbsent(key, new ConcurrentHashSet<String>());
+                    urls = notified.get(key);
+                }
+                urls.add(url.toFullString());
+                List<URL> list = toList(urls);
+                if (list != null && list.size() > 0) {
+                    for (NotifyListener listener : entry.getValue()) {
+                        notify(subscribe, listener, list);
+                        synchronized (listener) {
+                            listener.notify();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    protected void unregistered(URL url) {
+        for (Map.Entry<String, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
+            String key = entry.getKey();
+            URL subscribe = URL.valueOf(key);
+            if (UrlUtils.isMatch(subscribe, url)) {
+                Set<String> urls = notified.get(key);
+                if (urls != null) {
+                    urls.remove(url.toFullString());
+                }
+                List<URL> list = toList(urls);
+                if (list != null && list.size() > 0) {
+                    for (NotifyListener listener : entry.getValue()) {
+                        notify(subscribe, listener, list);
+                    }
+                }
+            }
+        }
+    }
+
+    protected void subscribed(URL url, NotifyListener listener) {
+        List<URL> urls = lookup(url);
+        if (urls != null && urls.size() > 0) {
+            notify(url, listener, urls);
+        }
+    }
+
+    private List<URL> toList(Set<String> urls) {
+        List<URL> list = new ArrayList<URL>();
+        if (urls != null && urls.size() > 0) {
+            for (String url : urls) {
+                list.add(URL.valueOf(url));
+            }
+        }
+        return list;
+    }
+
+    public void register(URL url) {
+        super.register(url);
+        registered(url);
+    }
+
+    public void unregister(URL url) {
+        super.unregister(url);
+        unregistered(url);
+    }
+
+    public void subscribe(URL url, NotifyListener listener) {
+        super.subscribe(url, listener);
+        subscribed(url, listener);
+    }
+
+    public void unsubscribe(URL url, NotifyListener listener) {
+        super.unsubscribe(url, listener);
+        notified.remove(url.toFullString());
+    }
+
+    public Map<String, Set<String>> getNotified() {
+        return notified;
     }
 
 }

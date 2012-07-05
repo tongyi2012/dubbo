@@ -19,13 +19,17 @@ import org.mortbay.jetty.Server;
 import org.mortbay.jetty.nio.SelectChannelConnector;
 import org.mortbay.jetty.servlet.ServletHandler;
 import org.mortbay.jetty.servlet.ServletHolder;
+import org.mortbay.jetty.servlet.ServletMapping;
 
+import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
+import com.alibaba.dubbo.common.utils.ConfigUtils;
 import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.container.Container;
 import com.alibaba.dubbo.container.page.PageServlet;
+import com.alibaba.dubbo.container.page.ResourceServlet;
 
 /**
  * JettyContainer. (SPI, Singleton, ThreadSafe)
@@ -37,25 +41,56 @@ public class JettyContainer implements Container {
 
     private static final Logger logger = LoggerFactory.getLogger(JettyContainer.class);
 
-    public static final String JETTY_PORT = "jetty.port";
+    public static final String JETTY_PORT = "dubbo.jetty.port";
+
+    public static final String JETTY_DIRECTORY = "dubbo.jetty.directory";
+
+    public static final String JETTY_PAGES = "dubbo.jetty.page";
 
     public static final int DEFAULT_JETTY_PORT = 8080;
 
     private SelectChannelConnector connector;
 
     public void start() {
-        String serverPort = System.getProperty(JETTY_PORT);
+        String serverPort = ConfigUtils.getProperty(JETTY_PORT);
         int port;
         if (serverPort == null || serverPort.length() == 0) {
             port = DEFAULT_JETTY_PORT;
         } else {
             port = Integer.parseInt(serverPort);
         }
-        SelectChannelConnector connector = new SelectChannelConnector();
+        connector = new SelectChannelConnector();
         connector.setPort(port);
         ServletHandler handler = new ServletHandler();
-        ServletHolder holder = handler.addServletWithMapping(PageServlet.class, "/*");
-        holder.setInitOrder(1);
+        
+        String resources = ConfigUtils.getProperty(JETTY_DIRECTORY);
+        if (resources != null && resources.length() > 0) {
+            String[] directories = Constants.COMMA_SPLIT_PATTERN.split(resources);
+            ResourceServlet resourceServlet = new ResourceServlet();
+            resourceServlet.setResources(directories);
+            ServletHolder resourceHolder = new ServletHolder(resourceServlet);
+            resourceHolder.setInitOrder(1);
+            handler.addServlet(resourceHolder);
+            for (String directory : directories) {
+                directory = directory.replace('\\', '/');
+                int i = directory.lastIndexOf('/');
+                String name;
+                if (i >= 0) {
+                    name = directory.substring(i + 1);
+                } else {
+                    name = directory;
+                }
+                ServletMapping resourceMapping = new ServletMapping();
+                resourceMapping.setServletName(resourceHolder.getName());
+                resourceMapping.setPathSpec("/" + name + "/*");
+                handler.addServletMapping(resourceMapping);
+            }
+        }
+
+        ServletHolder pageHolder = handler.addServletWithMapping(PageServlet.class, "/*");
+        pageHolder.setInitParameter("pages", ConfigUtils.getProperty(JETTY_PAGES));
+        pageHolder.setInitOrder(2);
+        
         Server server = new Server();
         server.addConnector(connector);
         server.addHandler(handler);
@@ -64,18 +99,21 @@ public class JettyContainer implements Container {
         } catch (Exception e) {
             throw new IllegalStateException("Failed to start jetty server on " + NetUtils.getLocalHost() + ":" + port + ", cause: " + e.getMessage(), e);
         }
-        logger.info("Dubbo jetty container started!");
     }
 
     public void stop() {
         try {
             if (connector != null) {
                 connector.close();
+                connector = null;
             }
         } catch (Throwable e) {
             logger.error(e.getMessage(), e);
         }
-        logger.info("Dubbo jetty container stopped!");
+    }
+
+    public SelectChannelConnector getConnector() {
+        return connector;
     }
 
 }

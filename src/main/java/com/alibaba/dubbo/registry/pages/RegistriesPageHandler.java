@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.alibaba.dubbo.container.page.pages;
+package com.alibaba.dubbo.registry.pages;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,40 +21,53 @@ import java.util.List;
 
 import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
+import com.alibaba.dubbo.common.utils.NetUtils;
+import com.alibaba.dubbo.container.page.Menu;
 import com.alibaba.dubbo.container.page.Page;
 import com.alibaba.dubbo.container.page.PageHandler;
 import com.alibaba.dubbo.registry.Registry;
+import com.alibaba.dubbo.registry.support.AbstractRegistry;
 import com.alibaba.dubbo.registry.support.AbstractRegistryFactory;
 
 /**
- * RegistryPageHandler
+ * RegistriesPageHandler
  * 
  * @author william.liangf
  */
-@Extension("registry")
-public class RegistryPageHandler implements PageHandler {
+@Menu(name = "Registries", desc = "Show connected registries.", order = 10000)
+@Extension("registries")
+public class RegistriesPageHandler implements PageHandler {
 
     public Page handle(URL url) {
         List<List<String>> rows = new ArrayList<List<String>>();
         Collection<Registry> registries = AbstractRegistryFactory.getRegistries();
+        int registeredCount = 0;
+        int subscribedCount = 0;
         if (registries != null && registries.size() > 0) {
-            int i = 0;
             for (Registry registry : registries) {
-                i ++;
                 String server = registry.getUrl().getAddress();
                 List<String> row = new ArrayList<String>();
-                row.add(String.valueOf(i));
-                row.add(server);
+                row.add(NetUtils.getHostName(server) + "/" + server);
                 if (registry.isAvailable()) {
-                    row.add("Connected");
+                    row.add("<font color=\"green\">Connected</font>");
                 } else {
-                    row.add("");
+                    row.add("<font color=\"red\">Disconnected</font>");
                 }
+                int registeredSize = 0;
+                int subscribedSize = 0;
+                if (registry instanceof AbstractRegistry) {
+                    registeredSize = ((AbstractRegistry) registry).getRegistered().size();
+                    registeredCount += registeredSize;
+                    subscribedSize = ((AbstractRegistry) registry).getSubscribed().size();
+                    subscribedCount += subscribedSize;
+                }
+                row.add("<a href=\"registered.html?registry=" + server + "\">Registered(" + registeredSize + ")</a>");
+                row.add("<a href=\"subscribed.html?registry=" + server + "\">Subscribed(" + subscribedSize + ")</a>");
                 rows.add(row);
             }
         }
-        return new Page("<a href=\"/\">Home</a> &gt; Registry", "Registries (" + rows.size() + ")",
-                new String[] { "Server Group:", "Server Address:", "Is Connected" }, rows);
+        return new Page("Registries", "Registries (" + rows.size() + ")",
+                new String[] { "Registry Address:", "Status", "Registered(" + registeredCount + ")", "Subscribed(" + subscribedCount + ")" }, rows);
     }
 
 }

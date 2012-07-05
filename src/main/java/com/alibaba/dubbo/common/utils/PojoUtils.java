@@ -17,6 +17,7 @@ package com.alibaba.dubbo.common.utils;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -318,17 +319,21 @@ public class PojoUtils {
             	for (Map.Entry<Object, Object> entry : tmp.entrySet()) {
             	    Type keyType = getGenericClassByIndex(genericType, 0);
             	    Type valueType = getGenericClassByIndex(genericType, 1);
-            	    Class<?> keyClazz = entry.getKey().getClass();
+            	    Class<?> keyClazz;
             	    if ( keyType instanceof Class){
-                      keyClazz = (Class<?>)keyType;
-            	    } 
-            	    Class<?> valueClazz = entry.getValue().getClass() ;
+            	        keyClazz = (Class<?>)keyType;
+            	    } else {
+            	        keyClazz = entry.getKey() == null ? null : entry.getKey().getClass();
+            	    }
+            	    Class<?> valueClazz;
                     if ( valueType instanceof Class){
                         valueClazz = (Class<?>)valueType;
+                    } else {
+                        valueClazz = entry.getValue() == null ? null : entry.getValue().getClass() ;
                     }
             	    
-            	    Object key = realize(entry.getKey(), keyClazz, keyType, history);
-            	    Object value = realize(entry.getValue(), valueClazz, valueType, history);
+            	    Object key = keyClazz == null ? entry.getKey() : realize(entry.getKey(), keyClazz, keyType, history);
+            	    Object value = valueClazz == null ? entry.getValue() : realize(entry.getValue(), valueClazz, valueType, history);
             		map.put(key, value);
             	}
         		return map;
@@ -359,6 +364,19 @@ public class PojoUtils {
 	                        }
 	                    }
                 	}
+                }
+                if (dest instanceof Throwable) {
+                    Object message = map.get("message");
+                    if (message instanceof String) {
+                        try {
+                            Field filed = Throwable.class.getDeclaredField("detailMessage");
+                            if(! filed.isAccessible()) {
+                                filed.setAccessible(true);
+                            }
+                            filed.set(dest, (String) message);
+                        } catch (Exception e) {
+                        }
+                    }
                 }
                 return dest;
             }

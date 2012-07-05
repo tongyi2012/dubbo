@@ -93,7 +93,13 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
     private transient boolean    initialized;
 
     private transient boolean    destroyed;
+
+    private final List<URL> urls = new ArrayList<URL>();
     
+    public List<URL> toUrls() {
+        return urls;
+    }
+
     public synchronized T get() {
         if (destroyed){
             throw new IllegalStateException("Already destroyed!");
@@ -106,7 +112,7 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
     
     public synchronized void destroy() {
         if (ref == null) {
-            throw new IllegalStateException("Uninitialized.");
+            return;
         }
         if (destroyed){
             return;
@@ -276,7 +282,6 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
         } else {
-            List<URL> urls = new ArrayList<URL>();
             if (url != null && url.length() > 0) { // 用户指定URL，指定的URL可能是对点对直连地址，也可能是注册中心URL
                 String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
@@ -407,15 +412,15 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
     private void checkDefault() {
         if (consumer == null) {
             consumer = new ConsumerConfig();
-            String t = getLegacyProperty("dubbo.service.invoke.timeout");
+            String t = ConfigUtils.getProperty("dubbo.service.invoke.timeout");
             if (t != null && t.length() > 0) {
                 consumer.setTimeout(Integer.parseInt(t.trim()));
             }
-            String r = getLegacyProperty("dubbo.service.max.retry.providers");
+            String r = ConfigUtils.getProperty("dubbo.service.max.retry.providers");
             if (r != null && r.length() > 0) {
                 consumer.setRetries(Integer.parseInt(r.trim()) - 1);
             }
-            String c = getLegacyProperty("dubbo.service.allow.no.provider");
+            String c = ConfigUtils.getProperty("dubbo.service.allow.no.provider");
             if (c != null && c.length() > 0) {
                 consumer.setCheck(!Boolean.parseBoolean(c));
             }

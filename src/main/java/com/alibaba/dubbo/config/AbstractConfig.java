@@ -15,18 +15,16 @@
  */
 package com.alibaba.dubbo.config;
 
-import java.io.InputStream;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.net.URLEncoder;
 import java.util.Map;
-import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.ExtensionLoader;
+import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 
@@ -41,8 +39,6 @@ public abstract class AbstractConfig implements Serializable {
 
     protected static final Logger logger = LoggerFactory.getLogger(AbstractConfig.class);
 
-    private static final Properties PROPERTIES = loadProperties();
-
     private static final int MAX_LENGTH = 100;
 
     private static final int MAX_PATH_LENGTH = 200;
@@ -56,38 +52,6 @@ public abstract class AbstractConfig implements Serializable {
     private static final Pattern PATTERN_NAME = Pattern.compile("[\\-._0-9a-zA-Z]+");
     
     private static final Pattern PATTERN_NAME_HAS_COLON= Pattern.compile("[:\\-._0-9a-zA-Z]+");
-    
-    protected static String getLegacyProperty(String key) {
-        String value = System.getProperty(key);
-        if (value == null || value.length() == 0) {
-            value = PROPERTIES.getProperty(key);
-        }
-        return value;
-    }
-    
-    public static void mergeProperties(Properties properties) {
-        if (properties != null) {
-            PROPERTIES.putAll(properties);
-        }
-    }
-    
-    private static Properties loadProperties() {
-        Properties properties = new Properties();
-        try {
-            InputStream input = Thread.currentThread().getContextClassLoader()
-                    .getResourceAsStream("dubbo.properties");
-            if (input != null) {
-                try {
-                    properties.load(input);
-                } finally {
-                    input.close();
-                }
-            }
-        } catch (Throwable e) {
-            logger.warn("Fail to load dubbo.properties file: " + e.getMessage(), e);
-        }
-        return properties;
-    }
     
     protected static void appendParameters(Map<String, String> parameters, Object config) {
         appendParameters(parameters, config, null);
@@ -151,18 +115,30 @@ public abstract class AbstractConfig implements Serializable {
                     }
                     Object value = method.invoke(config, new Object[0]);
                     if (attribute){
-                        if (prefix != null && prefix.length() > 0) {
-                            key = prefix + "." + key;
-                        }
-                        if (value != null) parameters.put(key, value);
-                    } else {
-                        String str = String.valueOf(value).trim();
-                        if (value != null && str.length() > 0) {
+                        if (value != null) {
                             if (prefix != null && prefix.length() > 0) {
                                 key = prefix + "." + key;
                             }
+                            parameters.put(key, value);
+                        }
+                    } else {
+                        String str = String.valueOf(value).trim();
+                        if (value != null && str.length() > 0) {
                             if (parameter != null && parameter.escaped()) {
-                                str = URLEncoder.encode(str, "UTF-8");
+                                str = URL.encode(str);
+                            }
+                            if (parameter != null && parameter.append()) {
+                                String pre = (String)parameters.get(Constants.DEFAULT_KEY + "." + key);
+                                if (pre != null && pre.length() > 0) {
+                                    str = pre + "," + str;
+                                }
+                                pre = (String)parameters.get(key);
+                                if (pre != null && pre.length() > 0) {
+                                    str = pre + "," + str;
+                                }
+                            }
+                            if (prefix != null && prefix.length() > 0) {
+                                key = prefix + "." + key;
                             }
                             parameters.put(key, str);
                         } else if (parameter != null && parameter.required()) {

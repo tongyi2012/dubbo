@@ -76,20 +76,12 @@ public abstract class AbstractConsumerConfig extends AbstractReferenceConfig {
         this.injvm = injvm;
     }
 
-    @Override
-    public void setTimeout(Integer timeout) {
-        super.setTimeout(timeout);
-        if (timeout != null && timeout > 0) {
-            System.setProperty("sun.rmi.transport.tcp.responseTimeout", String.valueOf(timeout));
-        }
-    }
-
-    @Parameter(key = Constants.REFERENCE_FILTER_KEY)
+    @Parameter(key = Constants.REFERENCE_FILTER_KEY, append = true)
     public String getFilter() {
         return super.getFilter();
     }
 
-    @Parameter(key = Constants.INVOKER_LISTENER_KEY)
+    @Parameter(key = Constants.INVOKER_LISTENER_KEY, append = true)
     public String getListener() {
         return super.getListener();
     }

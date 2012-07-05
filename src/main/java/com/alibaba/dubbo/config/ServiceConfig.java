@@ -85,10 +85,10 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     
     private transient boolean generic;
     
-    public boolean isExported() {
-        return exported;
+    public List<URL> toUrls() {
+        return urls;
     }
-    
+
     public synchronized void export() {
         if (delay != null && delay > 0) {
             Thread thread = new Thread(new Runnable() {
@@ -250,8 +250,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void unexport() {
-        if (!exported) {
-            throw new IllegalStateException("No exported!");
+        if (! exported) {
+            return;
         }
         if (unexported) {
             return;
@@ -438,19 +438,19 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     	// 兼容旧版本
         if (protocols == null || protocols.size() == 0) {
             ProtocolConfig providerBean = new ProtocolConfig();
-            String p = getLegacyProperty("dubbo.service.protocol");
+            String p = ConfigUtils.getProperty("dubbo.service.protocol");
             if (p != null && p.length() > 0) {
                 providerBean.setName(p);
             }
-            String h = getLegacyProperty("dubbo.service.server.host");
+            String h = ConfigUtils.getProperty("dubbo.service.server.host");
             if (h != null && h.length() > 0) {
                 providerBean.setHost(h);
             }
-            String o = getLegacyProperty("dubbo.service.server.port");
+            String o = ConfigUtils.getProperty("dubbo.service.server.port");
             if (o != null && o.length() > 0) {
                 providerBean.setPort(Integer.parseInt(o.trim()));
             }
-            String t = getLegacyProperty("dubbo.service.max.thread.pool.size");
+            String t = ConfigUtils.getProperty("dubbo.service.max.thread.pool.size");
             if (t != null && t.length() > 0) {
                 providerBean.setThreads(Integer.parseInt(t.trim()));
             }
@@ -459,7 +459,21 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public Class<?> getInterfaceClass() {
-        return interfaceClass == null ? GenericService.class : interfaceClass;
+        if (interfaceClass != null) {
+            return interfaceClass;
+        }
+        if (ref instanceof GenericService) {
+            return GenericService.class;
+        }
+        try {
+            if (interfaceName != null && interfaceName.length() > 0) {
+                this.interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
+                    .getContextClassLoader());
+            }
+        } catch (ClassNotFoundException t) {
+            throw new IllegalStateException(t.getMessage(), t);
+        }
+        return interfaceClass;
     }
 
     /**

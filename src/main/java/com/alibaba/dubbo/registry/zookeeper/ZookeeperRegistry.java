@@ -20,16 +20,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
+import org.apache.zookeeper.KeeperException.NodeExistsException;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.EventType;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.data.ACL;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
@@ -52,13 +57,25 @@ public class ZookeeperRegistry extends FailbackRegistry {
     
     private final static String SEPARATOR = "/";
 
+    private final static String DEFAULT_ROOT = "dubbo";
+
+    private final static String PROVIDERS = "providers";
+
+    private final static String CONSUMERS = "consumers";
+
     private final String        root;
     
     private final boolean       auth;
+    
+    private final List<ACL>     acl;
 
     private final ReentrantLock zookeeperLock = new ReentrantLock();
 
     private final Set<String> failedWatched = new ConcurrentHashSet<String>();
+
+    private final Set<String> anyServices = new ConcurrentHashSet<String>();
+    
+    private final ConcurrentMap<String, Set<NotifyListener>> anyNotifyListeners = new ConcurrentHashMap<String, Set<NotifyListener>>();
     
     private volatile ZooKeeper  zookeeper;
 
@@ -66,13 +83,12 @@ public class ZookeeperRegistry extends FailbackRegistry {
         super(url);
         this.auth = url.getUsername() != null && url.getUsername().length() > 0 
                 && url.getPassword() != null && url.getPassword().length() > 0;
-        String group = url.getParameter(Constants.GROUP_KEY);
-        if (group != null && group.length() > 0) {
+        this.acl = auth ? Ids.CREATOR_ALL_ACL : Ids.OPEN_ACL_UNSAFE;
+        String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);
+        if (! group.startsWith(SEPARATOR)) {
             group = SEPARATOR + group;
-            this.root = group;
-        } else {
-            this.root = "";
         }
+        this.root = group;
         initZookeeper();
     }
 
@@ -83,14 +99,14 @@ public class ZookeeperRegistry extends FailbackRegistry {
             Set<String> failed = new HashSet<String>(failedWatched);
             if (failed.size() > 0) {
                 if (logger.isInfoEnabled()) {
-                    logger.info("Retry watch " + failed);
+                    logger.info("Retry watch " + failed + " to zookeeper " + getUrl());
                 }
                 for (String service : failed) {
                     try {
-                        zookeeper.getChildren(service, true);
+                        getChildren(service);
                         failedWatched.remove(service);
                     } catch (Throwable t) {
-                        logger.warn("Failed to retry register " + failed + ", waiting for again, cause: " + t.getMessage(), t);
+                        logger.warn("Failed to retry register " + failed + " to zookeeper " + getUrl() + ", waiting for again, cause: " + t.getMessage(), t);
                     }
                 }
             }
@@ -101,34 +117,17 @@ public class ZookeeperRegistry extends FailbackRegistry {
         try {
             ZooKeeper zk = ZookeeperRegistry.this.zookeeper;
             if (zk != null) {
-                List<String> result = zookeeper.getChildren(service, true);
+                List<String> result = getChildren(service);
                 failedWatched.remove(service);
                 return result;
             }
         } catch (Throwable e) {
-            logger.warn(e.getMessage(), e);
+            logger.warn("Failed to watch path " + service + " to zookeeper" + getUrl() + ", cause: " + e.getMessage(), e);
         }
         failedWatched.add(service);
         return new ArrayList<String>(0);
     }
     
-    private void recover() {
-        for (String url : new HashSet<String>(getRegistered())) {
-            try {
-                register(URL.valueOf(url));
-            } catch (Throwable e) {
-                logger.warn(e.getMessage(), e);
-            }
-        }
-        for (String url : new HashSet<String>(getSubscribed().keySet())) {
-            try {
-                watch(toServicePath(URL.valueOf(url)));
-            } catch (Throwable e) {
-                logger.warn(e.getMessage(), e);
-            }
-        }
-    }
-
     private void initZookeeper() {
         ZooKeeper zk = this.zookeeper;
         if (zk == null || zk.getState() == null || ! zk.getState().isAlive()) {
@@ -143,7 +142,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     zk.close();
                 }
             } catch (Exception e) {
-                throw new IllegalStateException(e.getMessage(), e);
+                throw new IllegalStateException("Can not connect to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
             } finally {
                 zookeeperLock.unlock();
             }
@@ -174,32 +173,69 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     if (path == null || path.length() == 0) {
                         return;
                     }
-                    List<String> providers = watch(path);
-                    if (providers == null || providers.size() == 0) {
-                        return;
-                    }
-                    String service = path;
-                    int i = service.lastIndexOf(SEPARATOR);
-                    if (i >= 0) {
-                        service = service.substring(i + 1);
-                    }
-                    service = URL.decode(service);
-                    for (Map.Entry<String, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
-                        String key = entry.getKey();
-                        URL subscribe = URL.valueOf(key);
-                        String subscribeService = subscribe.getServiceName();
-                        if (service.equals(subscribeService)) {
-                            List<URL> list = toUrls(subscribe, providers);
-                            if (logger.isInfoEnabled()) {
-                                logger.info("Zookeeper service changed, service: " + service + ", urls: " + list);
+                    List<String> children = watch(path);
+                    if (path.equals(toRootPath())) {
+                        List<String> services = children;
+                        if (services != null && services.size() > 0) {
+                            for (String service : services) {
+                                if (anyServices.contains(service)) {
+                                    continue;
+                                }
+                                anyServices.add(service);
+                                for (Map.Entry<String, Set<NotifyListener>> entry : anyNotifyListeners.entrySet()) {
+                                    URL subscribeUrl = URL.valueOf(entry.getKey()).setPath(service).addParameters(
+                                            Constants.INTERFACE_KEY, service, 
+                                            Constants.CHECK_KEY, String.valueOf(false), 
+                                            Constants.REGISTER_KEY, String.valueOf(false));
+                                    for (NotifyListener listener : entry.getValue()) {
+                                        subscribe(subscribeUrl, listener);
+                                    }
+                                }
                             }
-                            for (NotifyListener listener : entry.getValue()) {
-                                ZookeeperRegistry.this.notify(subscribe, listener, list);
+                        }
+                    } else {
+                        String dir = toRootDir();
+                        String action = PROVIDERS;
+                        String service = path;
+                        if (service.startsWith(dir)) {
+                            service = service.substring(dir.length());
+                        }
+                        int i = service.indexOf(SEPARATOR);
+                        if (i >= 0) {
+                            action = service.substring(i + 1);
+                            service = service.substring(0, i);
+                        }
+                        service = URL.decode(service);
+                        List<String> adminChildren = null;
+                        for (Map.Entry<String, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
+                            String key = entry.getKey();
+                            URL subscribe = URL.valueOf(key);
+                            List<String> notifies = children;
+                            if (subscribe.getParameter(Constants.ADMIN_KEY, false)) {
+                                if (adminChildren == null) {
+                                    adminChildren = getChildren(path.substring(0, path.lastIndexOf(SEPARATOR) + 1) + (CONSUMERS.equals(action) ? PROVIDERS : CONSUMERS));
+                                    adminChildren.addAll(children);
+                                }
+                                notifies = adminChildren;
+                            } else if (CONSUMERS.equals(action)) {
+                                continue;
+                            }
+                            String subscribeService = subscribe.getServiceName();
+                            if (service.equals(subscribeService)) {
+                                List<URL> list = toUrls(subscribe, notifies);
+                                if (list != null && list.size() > 0) {
+                                    if (logger.isInfoEnabled()) {
+                                        logger.info("Zookeeper service changed, service: " + service + ", urls: " + list + ", zookeeper: " + getUrl());
+                                    }
+                                    for (NotifyListener listener : entry.getValue()) {
+                                        ZookeeperRegistry.this.notify(subscribe, listener, list);
+                                    }
+                                }
                             }
                         }
                     }
                 } catch (Throwable e) {
-                    logger.error(e.getMessage(), e);
+                    logger.error("Failed to received event path " + event.getPath() + " from zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
                 }
             }
         });
@@ -207,7 +243,10 @@ public class ZookeeperRegistry extends FailbackRegistry {
             zk.addAuthInfo(url.getUsername(), url.getPassword().getBytes());
         }
         if (root != null && root.length() > 0 && zk.exists(root, false) == null) {
-            zk.create(root, new byte[0], auth ? Ids.CREATOR_ALL_ACL : Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            try {
+                zk.create(root, new byte[0], acl, CreateMode.PERSISTENT);
+            } catch (NodeExistsException e) {
+            }
         }
         return zk;
     }
@@ -221,7 +260,125 @@ public class ZookeeperRegistry extends FailbackRegistry {
         try {
             zookeeper.close();
         } catch (Exception e) {
-            logger.warn(e.getMessage(), e);
+            logger.warn("Failed to close zookeeper client " + getUrl() + ", cause: " + e.getMessage(), e);
+        }
+    }
+    
+    protected void doRegister(URL url) {
+        try {
+            String service = toServicePath(url);
+            if (zookeeper.exists(service, false) == null) {
+                try {
+                    zookeeper.create(service, new byte[0], acl, CreateMode.PERSISTENT);
+                } catch (NodeExistsException e) {
+                }
+            }
+            String category = toCategoryPath(url);
+            if (zookeeper.exists(category, false) == null) {
+                try {
+                    zookeeper.create(category, new byte[0], acl, CreateMode.PERSISTENT);
+                } catch (NodeExistsException e) {
+                }
+            }
+            String provider = toProviderPath(url);
+            if (zookeeper.exists(provider, false) != null) {
+                try {
+                    zookeeper.delete(provider, -1);
+                } catch (NoNodeException e) {
+                }
+            }
+            CreateMode createMode = Constants.ROUTE_PROTOCOL.equals(url.getProtocol()) ? CreateMode.PERSISTENT : CreateMode.EPHEMERAL;
+            try {
+                zookeeper.create(provider, new byte[0], acl, createMode);
+            } catch (NodeExistsException e) {
+                try {
+                    zookeeper.delete(provider, -1);
+                } catch (NoNodeException e2) {
+                }
+                zookeeper.create(provider, new byte[0], acl, createMode);
+            }
+        } catch (Throwable e) {
+            throw new RpcException("Failed to register " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
+        }
+    }
+
+    protected void doUnregister(URL url) {
+        try {
+            String provider = toProviderPath(url);
+            zookeeper.delete(provider, -1);
+        } catch (Throwable e) {
+            throw new RpcException("Failed to unregister " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
+        }
+    }
+
+    protected void doSubscribe(URL url, NotifyListener listener) {
+        try {
+            if (Constants.ANY_VALUE.equals(url.getServiceName())) {
+                String key = url.toFullString();
+                Set<NotifyListener> listeners = anyNotifyListeners.get(key);
+                if (listeners == null) {
+                    anyNotifyListeners.putIfAbsent(key, new ConcurrentHashSet<NotifyListener>());
+                    listeners = anyNotifyListeners.get(key);
+                }
+                listeners.add(listener);
+                String root = toRootPath();
+                List<String> services = getChildren(root);
+                if (services != null && services.size() > 0) {
+                    anyServices.addAll(services);
+                    for (String service : services) {
+                        subscribe(url.setPath(service).addParameters(Constants.INTERFACE_KEY, service, 
+                                Constants.CHECK_KEY, String.valueOf(false), Constants.REGISTER_KEY, String.valueOf(false)), listener);
+                    }
+                }
+            } else {
+                if (url.getParameter(Constants.REGISTER_KEY, true)) {
+                    register(url);
+                }
+                String register = toRegisterPath(url);
+                List<String> providers = getChildren(register);
+                if (url.getParameter(Constants.ADMIN_KEY, false)) {
+                    String subscribe = toSubscribePath(url);
+                    List<String> consumers = getChildren(subscribe);
+                    providers.addAll(consumers);
+                }
+                List<URL> urls = toUrls(url, providers);
+                if (urls != null && urls.size() > 0) {
+                    notify(url, listener, urls);
+                }
+            }
+        } catch (Throwable e) {
+            throw new RpcException("Failed to subscribe " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
+        }
+    }
+    
+    private List<String> getChildren(String service) throws KeeperException, InterruptedException {
+        try {
+            List<String> list = zookeeper.getChildren(service, true);
+            if (list == null || list.size() == 0) {
+                return new ArrayList<String>(0);
+            }
+            List<String> result = new ArrayList<String>();
+            for (String value : list) {
+                result.add(URL.decode(value));
+            }
+            return result;
+        } catch (KeeperException e) {
+            if (e instanceof KeeperException.NoNodeException) {
+                return new ArrayList<String>(0);
+            }
+            throw e;
+        }
+    }
+    
+    protected void doUnsubscribe(URL url, NotifyListener listener) {
+        if (Constants.ANY_VALUE.equals(url.getServiceName())) {
+            String key = url.toFullString();
+            Set<NotifyListener> listeners = anyNotifyListeners.get(key);
+            if (listeners != null) {
+                listeners.remove(listener);
+            }
+        } else if (url.getParameter(Constants.REGISTER_KEY, true)) {
+            unregister(url);
         }
     }
     
@@ -230,70 +387,73 @@ public class ZookeeperRegistry extends FailbackRegistry {
             throw new IllegalArgumentException("lookup url == null");
         }
         try {
-            String service = toServicePath(url);
-            List<String> providers = zookeeper.getChildren(service, true);
+            String register = toRegisterPath(url);
+            List<String> providers = getChildren(register);
+            if (url.getParameter(Constants.ADMIN_KEY, false)) {
+                String subscribe = toSubscribePath(url);
+                List<String> consumers = getChildren(subscribe);
+                providers.addAll(consumers);
+            }
             return toUrls(url, providers);
         } catch (Throwable e) {
-            throw new RpcException("Failed to lookup " + url + ", cause: " + e.getMessage(), e);
+            throw new RpcException("Failed to lookup " + url + " from zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
         }
     }
     
-    protected void doRegister(URL url) {
-        try {
-            String service = toServicePath(url);
-            String provider = service + toProviderPath(url);
-            if (zookeeper.exists(service, false) == null) {
-                zookeeper.create(service, new byte[0], auth ? Ids.CREATOR_ALL_ACL : Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            }
-            if (zookeeper.exists(provider, false) == null) {
-                zookeeper.create(provider, new byte[0], auth ? Ids.CREATOR_ALL_ACL : Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-            }
-        } catch (Throwable e) {
-            throw new RpcException("Failed to register " + url + ", cause: " + e.getMessage(), e);
+    private String toRootDir() {
+        if (root.equals(SEPARATOR)) {
+            return root;
         }
+        return root + SEPARATOR;
     }
-
-    protected void doUnregister(URL url) {
-        try {
-            String service = toServicePath(url);
-            String provider = service + toProviderPath(url);
-            zookeeper.delete(provider, -1);
-        } catch (Throwable e) {
-            throw new RpcException("Failed to unregister " + url + ", cause: " + e.getMessage(), e);
-        }
-    }
-
-    protected void doSubscribe(URL url, NotifyListener listener) {
-        try {
-            String service = toServicePath(url);
-            List<String> providers = zookeeper.getChildren(service, true);
-            List<URL> urls = toUrls(url, providers);
-            if (urls != null && urls.size() > 0) {
-                notify(url, listener, urls);
-            }
-        } catch (Throwable e) {
-            throw new RpcException("Failed to subscribe " + url + ", cause: " + e.getMessage(), e);
-        }
-    }
-
-    protected void doUnsubscribe(URL url, NotifyListener listener) {
+    
+    private String toRootPath() {
+        return root;
     }
     
     private String toServicePath(URL url) {
-        return root + SEPARATOR + URL.encode(url.getServiceName());
+        String name = url.getServiceName();
+        if (Constants.ANY_VALUE.equals(name)) {
+            return toRootPath();
+        }
+        return toRootDir() + URL.encode(name);
     }
     
+    private String toCategoryPath(URL url) {
+        if (Constants.SUBSCRIBE_PROTOCOL.equals(url.getProtocol())) {
+            return toSubscribePath(url);
+        } else {
+            return toRegisterPath(url);
+        }
+    }
+
+    private String toRegisterPath(URL url) {
+        return toServicePath(url) + SEPARATOR + PROVIDERS;
+    }
+
+    private String toSubscribePath(URL url) {
+        return toServicePath(url) + SEPARATOR + CONSUMERS;
+    }
+
     private String toProviderPath(URL url) {
-        return SEPARATOR + URL.encode(url.toFullString());
+        return toCategoryPath(url) + SEPARATOR + URL.encode(url.toFullString());
     }
     
     private List<URL> toUrls(URL consumer, List<String> providers) throws KeeperException, InterruptedException {
         List<URL> urls = new ArrayList<URL>();
-        for (String provider : providers) {
-            URL url = URL.valueOf(URL.decode(provider));
-            if (UrlUtils.isMatch(consumer, url)) {
-                urls.add(url);
+        if (providers != null && providers.size() > 0) {
+            for (String provider : providers) {
+                provider = URL.decode(provider);
+                if (provider.contains("://")) {
+                    URL url = URL.valueOf(provider);
+                    if (UrlUtils.isMatch(consumer, url)) {
+                        urls.add(url);
+                    }
+                }
             }
+        }
+        if (urls != null && urls.isEmpty() && consumer.getParameter(Constants.ADMIN_KEY, false)) {
+            urls.add(consumer.setProtocol(Constants.EMPTY_PROTOCOL));
         }
         return urls;
     }

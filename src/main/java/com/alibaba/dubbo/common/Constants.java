@@ -28,10 +28,14 @@ import java.util.regex.Pattern;
 public class Constants {
 
     public static final List<String> DEFAULT_TELNET_COMMANDS    = Collections.unmodifiableList(Arrays.asList(new String[] {
-            "ls", "ps", "cd", "pwd", "invoke", "count", "trace", "status", "help", "clear", "exit","log" }));
+            "ls", "ps", "cd", "pwd", "invoke", "count", "trace", "status", "log", "help", "clear", "exit" }));
 
     public static final List<String> DEFAULT_CHECK_STATUSES    = Collections.unmodifiableList(Arrays.asList(new String[] {
             "server", "registry", "threadpool", "datasource", "spring", "memory", "load" }));
+    
+    public static final String       DUBBO_PROPERTIES_KEY           = "dubbo.properties.file";
+    
+    public static final String       DEFAULT_DUBBO_PROPERTIES       = "dubbo.properties";
 
     public static final String       SENT_KEY                       = "sent";
 
@@ -231,9 +235,11 @@ public class Constants {
     
     public static final String       SHUTDOWN_TIMEOUT_KEY           =  "shutdown.timeout";
     
-    public static final int          DEFAULT_SHUTDOWN_TIMEOUT       =  10000;
+    public static final int          DEFAULT_SHUTDOWN_TIMEOUT       =  1000 * 60 * 5;
 
     public static final String       CHECK_KEY                      = "check";
+
+    public static final String       REGISTER_KEY                   = "register";
 
     public static final String       GROUP_KEY                      = "group";
 
@@ -246,6 +252,8 @@ public class Constants {
     public static final String       FILE_KEY                       = "file";
 
     public static final String       WAIT_KEY                       = "wait";
+    
+    public static final String       ADMIN_KEY                      = "admin";
 
     public static final String       VERSION_KEY                    = "version";
 
@@ -277,7 +285,19 @@ public class Constants {
     
     public static final String       CONNECT_QUENE_WARNING_SIZE     = "connect.quene.warning.size";
     
-    public static final int          DEFAULT_CONNECT_QUENE_WARNING_SIZE    = 1000;
+    public static final int          DEFAULT_CONNECT_QUENE_WARNING_SIZE  = 1000;
+    
+    public static final String       CHANNEL_ATTRIBUTE_READONLY_KEY     = "channel.readonly";
+    
+    public static final String       CHANNEL_READONLYEVENT_SENT_KEY        = "channel.readonly.sent";
+    
+    public static final String       CHANNEL_SEND_READONLYEVENT_KEY        = "channel.readonly.send";
+
+    public static final String       SUBSCRIBE_PROTOCOL                 = "subscribe";
+
+    public static final String       EMPTY_PROTOCOL                     = "empty";
+
+    public static final String       ROUTE_PROTOCOL                     = "route";
 
     private Constants(){
     }

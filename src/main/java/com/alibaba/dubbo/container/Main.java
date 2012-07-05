@@ -15,11 +15,17 @@
  */
 package com.alibaba.dubbo.container;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.List;
 
+import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
+import com.alibaba.dubbo.common.utils.ConfigUtils;
 
 /**
  * Main. (API, Static, ThreadSafe)
@@ -28,33 +34,47 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
  */
 public class Main {
 
-    private static final Logger logger    = LoggerFactory.getLogger(Main.class);
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private static final ExtensionLoader<Container> loader = ExtensionLoader.getExtensionLoader(Container.class);
+    
+    public static final String CONTAINER_KEY = "dubbo.container";
 
     public static void main(String[] args) {
-        final Container[] containers;
-        if(null == args || args.length == 0) {
-            containers = new Container[] {ExtensionLoader.getExtensionLoader(Container.class).getDefaultExtension()};
-            logger.info("Use default container type(" + ExtensionLoader.getExtensionLoader(Container.class).getDefaultExtensionName() + ") to run dubbo serivce.");
-        } else {
-            containers = new Container[args.length];
+        try {
+            if (args == null || args.length == 0) {
+                String config = ConfigUtils.getProperty(CONTAINER_KEY, loader.getDefaultExtensionName());
+                args = Constants.COMMA_SPLIT_PATTERN.split(config);
+            }
+            
+            final List<Container> containers = new ArrayList<Container>();
             for (int i = 0; i < args.length; i ++) {
-                containers[i] = ExtensionLoader.getExtensionLoader(Container.class).getExtension(args[i]);
+                containers.add(loader.getExtension(args[i]));
             }
             logger.info("Use container type(" + Arrays.toString(args) + ") to run dubbo serivce.");
-        }
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            public void run() {
-                for (Container container : containers) {
-                    try {
-                        container.stop();
-                    } catch (Throwable t) {
-                        logger.error(t.getMessage(), t);
+            
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    for (Container container : containers) {
+                        try {
+                            container.stop();
+                            logger.info("Dubbo " + container.getClass().getSimpleName() + " stopped!");
+                        } catch (Throwable t) {
+                            logger.error(t.getMessage(), t);
+                        }
                     }
                 }
+            });
+            
+            for (Container container : containers) {
+                container.start();
+                logger.info("Dubbo " + container.getClass().getSimpleName() + " started!");
             }
-        });
-        for (Container container : containers) {
-            container.start();
+            System.out.println(new SimpleDateFormat("[yyyy-MM-dd HH:mm:ss]").format(new Date()) + " Dubbo service server started!");
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            logger.error(e.getMessage(), e);
+            throw e;
         }
         synchronized (Main.class) {
             for (;;) {

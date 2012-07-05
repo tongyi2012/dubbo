@@ -239,7 +239,7 @@
 		</xsd:attribute>
 		<xsd:attribute name="connections" type="xsd:string" use="optional">
 			<xsd:annotation>
-				<xsd:documentation><![CDATA[ The max connections. ]]></xsd:documentation>
+				<xsd:documentation><![CDATA[ The exclusive connections. default share one connection. ]]></xsd:documentation>
 			</xsd:annotation>
 		</xsd:attribute>
 		<xsd:attribute name="loadbalance" type="xsd:string" use="optional">
@@ -610,6 +610,11 @@
 			<xsd:attribute name="buffer" type="xsd:string" use="optional">
 				<xsd:annotation>
 					<xsd:documentation><![CDATA[ The buffer size. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="heartbeat" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The heartbeat interval.(ms) ]]></xsd:documentation>
 				</xsd:annotation>
 			</xsd:attribute>
 			<xsd:attribute name="accesslog" type="xsd:string" use="optional">
