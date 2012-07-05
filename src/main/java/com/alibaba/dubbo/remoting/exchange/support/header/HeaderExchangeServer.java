@@ -18,7 +18,6 @@ package com.alibaba.dubbo.remoting.exchange.support.header;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -26,7 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
-import com.alibaba.dubbo.common.Version;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
@@ -70,8 +68,8 @@ public class HeaderExchangeServer implements ExchangeServer {
             throw new IllegalArgumentException("server == null");
         }
         this.server = server;
-        this.heartbeat = server.getUrl().getParameter(Constants.HEARTBEAT_KEY, 0);
-        this.heartbeatTimeout = server.getUrl().getParameter(Constants.HEARTBEAT_TIMEOUT_KEY, heartbeat * 3);
+        this.heartbeat = server.getUrl().getIntParameter(Constants.HEARTBEAT_KEY, Constants.DEFAULT_HEARTBEAT);
+        this.heartbeatTimeout = server.getUrl().getIntParameter(Constants.HEARTBEAT_TIMEOUT_KEY, heartbeat * 3);
         if (heartbeatTimeout < heartbeat * 2) {
             throw new IllegalStateException("heartbeatTimeout < heartbeatInterval * 2");
         }
@@ -105,9 +103,6 @@ public class HeaderExchangeServer implements ExchangeServer {
         if (timeout > 0) {
             final long max = (long) timeout;
             final long start = System.currentTimeMillis();
-            if (getUrl().getParameter(Constants.CHANNEL_SEND_READONLYEVENT_KEY, false)){
-                sendChannelReadOnlyEvent();
-            }
             while (HeaderExchangeServer.this.isRunning() 
                     && System.currentTimeMillis() - start < max) {
                 try {
@@ -121,28 +116,19 @@ public class HeaderExchangeServer implements ExchangeServer {
         server.close(timeout);
     }
     
-    private void sendChannelReadOnlyEvent(){
-        Request request = new Request();
-        request.setEvent(Request.READONLY_EVENT);
-        request.setTwoWay(false);
-        request.setVersion(Version.getVersion());
-        
-        Collection<Channel> channels = getChannels();
-        for (Channel channel : channels) {
-            try {
-                if (channel.isConnected())channel.send(request, getUrl().getParameter(Constants.CHANNEL_READONLYEVENT_SENT_KEY, true));
-            } catch (RemotingException e) {
-                logger.warn("send connot write messge error.", e);
-            }
-        }
-    }
-    
     private void doClose() {
         if (closed) {
             return;
         }
         closed = true;
-        stopHeartbeatTimer();
+        try {
+            if (null != heatbeatTimer) {
+                heatbeatTimer.cancel(true);
+                heatbeatTimer = null;
+            }
+        } catch (Throwable t) {
+            logger.warn(t.getMessage(), t);
+        }
         try {
             scheduled.shutdown();
         } catch (Throwable t) {
@@ -196,8 +182,8 @@ public class HeaderExchangeServer implements ExchangeServer {
         try {
             if (url.hasParameter(Constants.HEARTBEAT_KEY)
                     || url.hasParameter(Constants.HEARTBEAT_TIMEOUT_KEY)) {
-                int h = url.getParameter(Constants.HEARTBEAT_KEY, heartbeat);
-                int t = url.getParameter(Constants.HEARTBEAT_TIMEOUT_KEY, h * 3);
+                int h = url.getIntParameter(Constants.HEARTBEAT_KEY, heartbeat);
+                int t = url.getIntParameter(Constants.HEARTBEAT_TIMEOUT_KEY, h * 3);
                 if (t < h * 2) {
                     throw new IllegalStateException("heartbeatTimeout < heartbeatInterval * 2");
                 }
@@ -210,11 +196,6 @@ public class HeaderExchangeServer implements ExchangeServer {
         } catch (Throwable t) {
             logger.error(t.getMessage(), t);
         }
-    }
-    
-    @Deprecated
-    public void reset(com.alibaba.dubbo.common.Parameters parameters){
-        reset(getUrl().addParameters(parameters.getParameters()));
     }
 
     public void send(Object message) throws RemotingException {
@@ -232,20 +213,6 @@ public class HeaderExchangeServer implements ExchangeServer {
     }
 
     private void startHeatbeatTimer() {
-        stopHeartbeatTimer();
-        if (heartbeat > 0) {
-            heatbeatTimer = scheduled.scheduleWithFixedDelay(
-                    new HeartBeatTask( new HeartBeatTask.ChannelProvider() {
-                        public Collection<Channel> getChannels() {
-                            return Collections.unmodifiableCollection(
-                                    HeaderExchangeServer.this.getChannels() );
-                        }
-                    }, heartbeat, heartbeatTimeout),
-                    heartbeat, heartbeat,TimeUnit.MILLISECONDS);
-        }
-    }
-
-    private void stopHeartbeatTimer() {
         try {
             ScheduledFuture<?> timer = heatbeatTimer;
             if (timer != null && ! timer.isCancelled()) {
@@ -253,8 +220,44 @@ public class HeaderExchangeServer implements ExchangeServer {
             }
         } catch (Throwable t) {
             logger.warn(t.getMessage(), t);
-        } finally {
-            heatbeatTimer =null;
+        }
+        if (heartbeat > 0) {
+            heatbeatTimer = scheduled.scheduleWithFixedDelay(new HeartBeatTask(), heartbeat, heartbeat,
+                                                             TimeUnit.MILLISECONDS);
+        }
+    }
+
+    private class HeartBeatTask implements Runnable {
+        public void run() {
+            try {
+                long now = System.currentTimeMillis();
+                for (Channel channel : getChannels()) {
+                    try {
+                        Long lastRead = (Long) channel.getAttribute(HeaderExchangeHandler.KEY_READ_TIMESTAMP);
+                        Long lastWrite = (Long) channel.getAttribute(HeaderExchangeHandler.KEY_WRITE_TIMESTAMP);
+                        if ((lastRead != null && now - lastRead > heartbeat)
+                            || (lastWrite != null && now - lastWrite > heartbeat)) {
+                            Request req = new Request();
+                            req.setVersion("2.0.0");
+                            req.setTwoWay(true);
+                            req.setHeartbeat(true);
+                            channel.send(req);
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("Send heartbeat to client " + channel.getRemoteAddress() + ".");
+                            }
+                        }
+                        if (lastRead != null && now - lastRead > heartbeatTimeout) {
+                            logger.warn("Close remote client " + channel.getRemoteAddress()
+                                        + ", because heartbeat read idle time out.");
+                            channel.close();
+                        }
+                    } catch (Throwable t) {
+                        logger.warn("Exception when heartbeat to client " + (InetSocketAddress) channel.getRemoteAddress(), t);
+                    }
+                }
+            } catch (Throwable t) {
+                logger.info("Exception when heartbeat to clients: ", t);
+            }
         }
     }
 

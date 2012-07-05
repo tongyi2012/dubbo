@@ -20,7 +20,7 @@ import java.lang.reflect.Method;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.Lifecycle;
 
-import com.alibaba.dubbo.common.extension.Activate;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.status.Status;
@@ -32,7 +32,7 @@ import com.alibaba.dubbo.config.spring.ServiceBean;
  * 
  * @author william.liangf
  */
-@Activate
+@Extension("spring")
 public class SpringStatusChecker implements StatusChecker {
     
     private static final Logger logger = LoggerFactory.getLogger(SpringStatusChecker.class);
@@ -69,12 +69,20 @@ public class SpringStatusChecker implements StatusChecker {
                 }
                 String[] configs = (String[]) method.invoke(context, new Object[0]);
                 if (configs != null && configs.length > 0) {
+                    String dubboConfig = configs[0];
                     for (String config : configs) {
-                        if (buf.length() > 0) {
-                            buf.append(",");
+                        if (config.contains("dubbo") 
+                                || config.contains("provider") 
+                                || config.contains("server")) {
+                            dubboConfig = config;
+                            break;
                         }
-                        buf.append(config);
                     }
+                    int i = dubboConfig.lastIndexOf('/');
+                    if (i > 0) {
+                        dubboConfig = dubboConfig.substring(i + 1);
+                    }
+                    buf.append(dubboConfig);
                 }
             }
         } catch (Throwable t) {

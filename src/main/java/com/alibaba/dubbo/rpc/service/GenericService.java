@@ -19,7 +19,6 @@ package com.alibaba.dubbo.rpc.service;
  * 通用服务接口
  * 
  * @author william.liangf
- * @export
  */
 public interface GenericService {
 

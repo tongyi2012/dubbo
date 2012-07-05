@@ -1,0 +1,7 @@
+com.alibaba.dubbo.config.spring.status.SpringStatusChecker
+com.alibaba.dubbo.config.spring.status.DataSourceStatusChecker
+com.alibaba.dubbo.registry.status.RegistryStatusChecker
+com.alibaba.dubbo.rpc.dubbo.status.ServerStatusChecker
+com.alibaba.dubbo.rpc.dubbo.status.ThreadPoolStatusChecker
+com.alibaba.dubbo.common.status.support.MemoryStatusChecker
+com.alibaba.dubbo.common.status.support.LoadStatusChecker

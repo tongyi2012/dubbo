@@ -21,16 +21,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.registry.Registry;
 import com.alibaba.dubbo.registry.RegistryFactory;
-import com.alibaba.dubbo.registry.RegistryService;
 
 /**
- * AbstractRegistryFactory. (SPI, Singleton, ThreadSafe)
+ * RegistryLocators. (API, Static, ThreadSafe)
  * 
  * @see com.alibaba.dubbo.registry.RegistryFactory
  * @author william.liangf
@@ -41,10 +39,32 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractRegistryFactory.class);
 
     // 注册中心获取过程锁
-    private static final ReentrantLock LOCK = new ReentrantLock();
-
+    protected static final ReentrantLock LOCK = new ReentrantLock();
+    
     // 注册中心集合 Map<RegistryAddress, Registry>
-    private static final Map<String, Registry> REGISTRIES = new ConcurrentHashMap<String, Registry>();
+    protected static final Map<String, Registry> REGISTRIES = new ConcurrentHashMap<String, Registry>();
+
+    public Registry getRegistry(URL url) {
+        // 锁定注册中心获取过程，保证注册中心单一实例
+        LOCK.lock();
+        try {
+            Registry registry = REGISTRIES.get(getCacheKey(url));
+            if (registry != null) {
+                return registry;
+            }
+            registry = createRegistry(url);
+            if (registry == null) {
+                throw new IllegalStateException("Can not create registry " + url);
+            }
+            REGISTRIES.put(getCacheKey(url), registry);
+            return registry;
+        } finally {
+            // 释放锁
+            LOCK.unlock();
+        }
+    }
+    
+    protected abstract Registry createRegistry(URL url);
 
     /**
      * 获取所有注册中心
@@ -54,7 +74,7 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
     public static Collection<Registry> getRegistries() {
         return Collections.unmodifiableCollection(REGISTRIES.values());
     }
-
+    
     /**
      * 关闭所有已创建注册中心
      */
@@ -78,29 +98,9 @@ public abstract class AbstractRegistryFactory implements RegistryFactory {
             LOCK.unlock();
         }
     }
-
-    public Registry getRegistry(URL url) {
-    	url = url.setPath(RegistryService.class.getName()).addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName());
-    	String key = url.toServiceString();
-        // 锁定注册中心获取过程，保证注册中心单一实例
-        LOCK.lock();
-        try {
-            Registry registry = REGISTRIES.get(key);
-            if (registry != null) {
-                return registry;
-            }
-            registry = createRegistry(url);
-            if (registry == null) {
-                throw new IllegalStateException("Can not create registry " + url);
-            }
-            REGISTRIES.put(key, registry);
-            return registry;
-        } finally {
-            // 释放锁
-            LOCK.unlock();
-        }
+    
+    protected static String getCacheKey(URL url){
+        return url.getProtocol() + "://" + url.getUsername() + ":" + url.getPassword() + "@" + url.getAddress();
     }
-
-    protected abstract Registry createRegistry(URL url);
-
+    
 }

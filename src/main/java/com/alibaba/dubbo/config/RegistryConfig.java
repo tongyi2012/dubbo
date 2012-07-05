@@ -15,17 +15,15 @@
  */
 package com.alibaba.dubbo.config;
 
-import java.util.Map;
-
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.config.support.Parameter;
+import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.registry.support.AbstractRegistryFactory;
+import com.alibaba.dubbo.remoting.Transporter;
+import com.alibaba.dubbo.rpc.RpcConstants;
 
 /**
  * RegistryConfig
  * 
  * @author william.liangf
- * @export
  */
 public class RegistryConfig extends AbstractConfig {
 
@@ -61,9 +59,6 @@ public class RegistryConfig extends AbstractConfig {
 
     // 注册中心请求超时时间(毫秒)
     private Integer           timeout;
-
-    // 注册中心会话超时时间(毫秒)
-    private Integer           session;
     
     // 动态注册中心列表存储文件
     private String            file;
@@ -82,12 +77,6 @@ public class RegistryConfig extends AbstractConfig {
     
     // 在该注册中心上服务是否引用
     private Boolean           subscribe;
-
-    // 自定义参数
-    private Map<String, String> parameters;
-
-    // 是否为缺省
-    private Boolean             isDefault;
     
     public RegistryConfig() {
     }
@@ -143,7 +132,7 @@ public class RegistryConfig extends AbstractConfig {
     /**
      * @deprecated
      * @see com.alibaba.dubbo.config.ProviderConfig#getWait()
-     * @return wait
+     * @return
      */
     @Deprecated
     public Integer getWait() {
@@ -159,7 +148,7 @@ public class RegistryConfig extends AbstractConfig {
     public void setWait(Integer wait) {
         this.wait = wait;
         if( wait!=null && wait>0)
-            System.setProperty(Constants.SHUTDOWN_WAIT_KEY, String.valueOf(wait));
+            System.setProperty(RpcConstants.SHUTDOWN_TIMEOUT_KEY, String.valueOf(wait));
     }
     
     public Boolean isCheck() {
@@ -182,7 +171,7 @@ public class RegistryConfig extends AbstractConfig {
     /**
      * @deprecated
      * @see #getTransporter()
-     * @return transport
+     * @return
      */
     @Deprecated
     @Parameter(excluded = true)
@@ -206,9 +195,9 @@ public class RegistryConfig extends AbstractConfig {
 
     public void setTransporter(String transporter) {
         checkName("transporter", transporter);
-        /*if(transporter != null && transporter.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(transporter)){
+        if(transporter != null && transporter.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(transporter)){
             throw new IllegalStateException("No such transporter type : " + transporter);
-        }*/
+        }
         this.transporter = transporter;
     }
     
@@ -218,9 +207,9 @@ public class RegistryConfig extends AbstractConfig {
     
     public void setServer(String server) {
         checkName("server", server);
-        /*if(server != null && server.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(server)){
+        if(server != null && server.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(server)){
             throw new IllegalStateException("No such server type : " + server);
-        }*/
+        }
         this.server = server;
     }
     
@@ -230,9 +219,9 @@ public class RegistryConfig extends AbstractConfig {
     
     public void setClient(String client) {
         checkName("client", client);
-        /*if(client != null && client.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(client)){
+        if(client != null && client.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(client)){
             throw new IllegalStateException("No such client type : " + client);
-        }*/
+        }
         this.client = client;
     }
 
@@ -243,14 +232,6 @@ public class RegistryConfig extends AbstractConfig {
 	public void setTimeout(Integer timeout) {
 		this.timeout = timeout;
 	}
-
-    public Integer getSession() {
-        return session;
-    }
-
-    public void setSession(Integer session) {
-        this.session = session;
-    }
 
     public Boolean isDynamic() {
         return dynamic;
@@ -276,6 +257,10 @@ public class RegistryConfig extends AbstractConfig {
         this.subscribe = subscribe;
     }
 
+    public static void closeAll() {
+        AbstractRegistryFactory.destroyAll();
+    }
+
     public String getGroup() {
         return group;
     }
@@ -290,32 +275,6 @@ public class RegistryConfig extends AbstractConfig {
 
     public void setVersion(String version) {
         this.version = version;
-    }
-
-    public Map<String, String> getParameters() {
-        return parameters;
-    }
-
-    public void setParameters(Map<String, String> parameters) {
-        checkParameterName(parameters);
-        this.parameters = parameters;
-    }
-
-    public Boolean isDefault() {
-        return isDefault;
-    }
-
-    public void setDefault(Boolean isDefault) {
-        this.isDefault = isDefault;
-    }
-
-    public static void destroyAll() {
-        AbstractRegistryFactory.destroyAll();
-    }
-
-    @Deprecated
-    public static void closeAll() {
-        destroyAll();
     }
 
 }

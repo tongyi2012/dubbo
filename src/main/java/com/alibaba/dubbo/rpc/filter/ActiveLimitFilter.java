@@ -16,8 +16,8 @@
 package com.alibaba.dubbo.rpc.filter;
 
 import com.alibaba.dubbo.common.Constants;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
-import com.alibaba.dubbo.common.extension.Activate;
 import com.alibaba.dubbo.rpc.Filter;
 import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
@@ -30,22 +30,23 @@ import com.alibaba.dubbo.rpc.RpcStatus;
  * 
  * @author william.liangf
  */
-@Activate(group = Constants.CONSUMER, value = Constants.ACTIVES_KEY)
+@Extension("activelimit")
 public class ActiveLimitFilter implements Filter {
 
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
         URL url = invoker.getUrl();
         String methodName = invocation.getMethodName();
-        int max = invoker.getUrl().getMethodParameter(methodName, Constants.ACTIVES_KEY, 0);
+        int max = invoker.getUrl().getMethodIntParameter(methodName, Constants.ACTIVES_KEY);
         RpcStatus count = RpcStatus.getStatus(invoker.getUrl(), invocation.getMethodName());
         if (max > 0) {
-            long timeout = invoker.getUrl().getMethodParameter(invocation.getMethodName(), Constants.TIMEOUT_KEY, 0);
+            long timeout = invoker.getUrl().getMethodIntParameter(invocation.getMethodName(), Constants.TIMEOUT_KEY);
             long start = System.currentTimeMillis();
             long remain = timeout;
             int active = count.getActive();
             if (active >= max) {
                 synchronized (count) {
-                    while ((active = count.getActive()) >= max) {
+                    active = count.getActive();
+                    while (active >= max) {
                         try {
                             count.wait(remain);
                         } catch (InterruptedException e) {

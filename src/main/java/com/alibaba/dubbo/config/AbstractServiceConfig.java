@@ -19,63 +19,55 @@ import java.util.Arrays;
 import java.util.List;
 
 import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.config.support.Parameter;
 import com.alibaba.dubbo.rpc.ExporterListener;
 
 /**
  * AbstractServiceConfig
  * 
  * @author william.liangf
- * @export
  */
-public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
+public abstract class AbstractServiceConfig extends AbstractReferenceConfig {
 
-    private static final long      serialVersionUID = 1L;
-
+    private static final long serialVersionUID = 1L;
+    
     // 服务版本
-    protected String               version;
+    protected String              version;
 
     // 服务分组
-    protected String               group;
-
+    protected String              group;
+    
     // 服务是否已经deprecated
-    protected Boolean              deprecated;
-
-    // 延迟暴露
-    protected Integer              delay;
-
-    // 是否暴露
-    protected Boolean              export;
+    protected Boolean             deprecated;
+    
+    // 延迟注册
+    protected Integer             delay;
 
     // 权重
-    protected Integer              weight;
+    protected Integer             weight;
 
     // 应用文档
-    protected String               document;
-
+    protected String              document;
+    
     // 在注册中心上注册成动态的还是静态的服务
-    protected Boolean              dynamic;
+    protected Boolean             dynamic;
 
     // 是否使用令牌
-    protected String               token;
-
+    protected String              token;
+    
     // 访问日志
-    protected String               accesslog;
-
+    protected String              accesslog;
+    
     // 允许执行请求数
-    private Integer                executes;
+    private Integer               executes;
 
     protected List<ProtocolConfig> protocols;
-
-    // 是否注册
-    private Boolean                register;
 
     public String getVersion() {
         return version;
     }
 
     public void setVersion(String version) {
-        checkKey("version", version);
+        checkName("version", version);
         this.version = version;
     }
 
@@ -84,7 +76,7 @@ public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
     }
 
     public void setGroup(String group) {
-        checkKey("group", group);
+        checkName("group", group);
         this.group = group;
     }
 
@@ -95,14 +87,6 @@ public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
 	public void setDelay(Integer delay) {
 	    this.delay = delay;
 	}
-
-    public Boolean getExport() {
-        return export;
-    }
-
-    public void setExport(Boolean export) {
-        this.export = export;
-    }
     
     public Integer getWeight() {
         return weight;
@@ -195,12 +179,12 @@ public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
         this.executes = executes;
     }
 
-    @Parameter(key = Constants.SERVICE_FILTER_KEY, append = true)
+    @Parameter(key = Constants.SERVICE_FILTER_KEY)
     public String getFilter() {
         return super.getFilter();
     }
 
-    @Parameter(key = Constants.EXPORTER_LISTENER_KEY, append = true)
+    @Parameter(key = Constants.EXPORTER_LISTENER_KEY)
     public String getListener() {
         return super.getListener();
     }
@@ -209,16 +193,5 @@ public abstract class AbstractServiceConfig extends AbstractInterfaceConfig {
     public void setListener(String listener) {
         checkMultiExtension(ExporterListener.class, "listener", listener);
         super.setListener(listener);
-    }
-
-    public Boolean isRegister() {
-        return register;
-    }
-
-    public void setRegister(Boolean register) {
-        this.register = register;
-        if (Boolean.FALSE.equals(register)) {
-            setRegistry(new RegistryConfig(RegistryConfig.NO_AVAILABLE));
-        }
     }
 }

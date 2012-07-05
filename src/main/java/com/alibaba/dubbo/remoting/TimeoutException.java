@@ -23,7 +23,6 @@ import java.net.InetSocketAddress;
  * @see com.alibaba.dubbo.remoting.exchange.ResponseFuture#get()
  * @see com.alibaba.dubbo.remoting.exchange.ResponseFuture#get(int)
  * @author qian.lei
- * @export
  */
 public class TimeoutException extends RemotingException {
 

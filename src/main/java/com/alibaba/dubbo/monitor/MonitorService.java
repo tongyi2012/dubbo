@@ -34,11 +34,9 @@ public interface MonitorService {
 
     String VERSION = "version";
 
-    String CONSUMER = "consumer";
+    String CLIENT = "client";
 
-    String PROVIDER = "provider";
-    
-    String TIMESTAMP = "timestamp";
+    String SERVER = "server";
 
     String SUCCESS = "success";
 
@@ -61,10 +59,10 @@ public interface MonitorService {
     String MAX_CONCURRENT = "max.concurrent";
 
     /**
-     * collect.
+     * count.
      * 
      * @param statistics
      */
-    void collect(URL statistics);
+    void count(URL statistics);
     
 }

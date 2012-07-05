@@ -16,32 +16,20 @@
 package com.alibaba.dubbo.rpc;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
-import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.utils.NetUtils;
 
 /**
  * Thread local context. (API, ThreadLocal, ThreadSafe)
  * 
- * 注意：RpcContext是一个临时状态记录器，当接收到RPC请求，或发起RPC请求时，RpcContext的状态都会变化。
- * 比如：A调B，B再调C，则B机器上，在B调C之前，RpcContext记录的是A调B的信息，在B调C之后，RpcContext记录的是B调C的信息。
- * 
  * @see com.alibaba.dubbo.rpc.filter.ContextFilter
+ * @see com.alibaba.dubbo.rpc.support.AbstractExporter#invoke(Invocation, InetSocketAddress)
  * @author qian.lei
  * @author william.liangf
- * @export
  */
 public class RpcContext {
 	
@@ -70,69 +58,43 @@ public class RpcContext {
 	    LOCAL.remove();
 	}
 
-    private Future<?> future;
-
-    private List<URL> urls;
-
-    private URL url;
-
-    private String methodName;
-
-    private Class<?>[] parameterTypes;
-
-    private Object[] arguments;
-
+    private final Map<String, Object> values = new HashMap<String, Object>();
+    
+    private final Map<String, String> attachments = new HashMap<String, String>();
+    
+    private Invoker<?> invoker;
+    
+    private Invocation invocation;
+    
 	private InetSocketAddress localAddress;
 
 	private InetSocketAddress remoteAddress;
-
-    private final Map<String, String> attachments = new HashMap<String, String>();
-
-    private final Map<String, Object> values = new HashMap<String, Object>();
-    
-	@Deprecated
-    private List<Invoker<?>> invokers;
-    
-	@Deprecated
-    private Invoker<?> invoker;
-
-	@Deprecated
-    private Invocation invocation;
-    
+	
+	private Future<?> future;
+	
 	protected RpcContext() {
 	}
 
     /**
-     * is provider side.
+     * is server side.
      * 
-     * @return provider side.
+     * @return server side.
      */
-    public boolean isProviderSide() {
-        URL url = getUrl();
-        if (url == null) {
-            return false;
-        }
-        InetSocketAddress address = getRemoteAddress();
-        if (address == null) {
-            return false;
-        }
-        String host;
-        if (address.getAddress() == null) {
-            host = address.getHostName();
-        } else {
-            host = address.getAddress().getHostAddress();
-        }
-        return url.getPort() != address.getPort() || 
-                ! NetUtils.filterLocalHost(url.getIp()).equals(NetUtils.filterLocalHost(host));
+    public boolean isServerSide() {
+        return ! isClientSide();
     }
 
     /**
-     * is consumer side.
+     * is client side.
      * 
-     * @return consumer side.
+     * @return client side.
      */
-    public boolean isConsumerSide() {
-        URL url = getUrl();
+    public boolean isClientSide() {
+        Invoker<?> invoker = getInvoker();
+        if (invoker == null) {
+            return false;
+        }
+        URL url = invoker.getUrl();
         if (url == null) {
             return false;
         }
@@ -147,82 +109,47 @@ public class RpcContext {
             host = address.getAddress().getHostAddress();
         }
         return url.getPort() == address.getPort() && 
-                NetUtils.filterLocalHost(url.getIp()).equals(NetUtils.filterLocalHost(host));
+                NetUtils.filterLocalHost(url.getHost()).equals(NetUtils.filterLocalHost(host));
+    }
+    
+    /**
+     * set current invoker.
+     * 
+     * @param invoker
+     * @return context
+     */
+    public RpcContext setInvoker(Invoker<?> invoker) {
+        this.invoker = invoker;
+        return this;
     }
 
     /**
-     * get future.
+     * get current invoker.
      * 
-     * @param <T>
-     * @return future
+     * @return invoker
      */
-    @SuppressWarnings("unchecked")
-    public <T> Future<T> getFuture() {
-        return (Future<T>) future;
+    public Invoker<?> getInvoker() {
+        return invoker;
+    }
+    
+    /**
+     * set invocation.
+     * 
+     * @param invocation
+     * @return context
+     */
+    public RpcContext setInvocation(Invocation invocation) {
+        this.invocation = invocation;
+        return this;
     }
 
     /**
-     * set future.
+     * get invocation.
      * 
-     * @param future
+     * @return invocation
      */
-    public void setFuture(Future<?> future) {
-        this.future = future;
-    }
-
-    public List<URL> getUrls() {
-        return urls == null && url != null ? (List<URL>) Arrays.asList(url) : urls;
-    }
-
-    public void setUrls(List<URL> urls) {
-        this.urls = urls;
-    }
-
-    public URL getUrl() {
-        return url;
-    }
-
-    public void setUrl(URL url) {
-        this.url = url;
-    }
-
-    /**
-     * get method name.
-     * 
-     * @return method name.
-     */
-    public String getMethodName() {
-        return methodName;
-    }
-
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
-    }
-
-    /**
-     * get parameter types.
-     * 
-     * @serial
-     */
-    public Class<?>[] getParameterTypes() {
-        return parameterTypes;
-    }
-
-    public void setParameterTypes(Class<?>[] parameterTypes) {
-        this.parameterTypes = parameterTypes;
-    }
-
-    /**
-     * get arguments.
-     * 
-     * @return arguments.
-     */
-    public Object[] getArguments() {
-        return arguments;
-    }
-
-    public void setArguments(Object[] arguments) {
-        this.arguments = arguments;
+    public Invocation getInvocation() {
+        return invocation;
     }
 
     /**
@@ -375,78 +302,28 @@ public class RpcContext {
     }
 
     /**
-     * get attachment.
-     * 
-     * @param key
-     * @return attachment
-     */
-    public String getAttachment(String key) {
-        return attachments.get(key);
-    }
-
-    /**
-     * set attachment.
-     * 
-     * @param key
-     * @param value
-     * @return context
-     */
-    public RpcContext setAttachment(String key, String value) {
-        if (value == null) {
-            attachments.remove(key);
-        } else {
-            attachments.put(key, value);
-        }
-        return this;
-    }
-
-    /**
-     * remove attachment.
-     * 
-     * @param key
-     * @return context
-     */
-    public RpcContext removeAttachment(String key) {
-        attachments.remove(key);
-        return this;
-    }
-
-    /**
-     * get attachments.
-     * 
-     * @return attachments
-     */
-    public Map<String, String> getAttachments() {
-        return attachments;
-    }
-
-    /**
-     * set attachments
-     * 
-     * @param attachment
-     * @return context
-     */
-    public RpcContext setAttachments(Map<String, String> attachment) {
-        this.attachments.clear();
-        if (attachment != null && attachment.size() > 0) {
-            this.attachments.putAll(attachment);
-        }
-        return this;
-    }
-    
-    public void clearAttachments() {
-        this.attachments.clear();
-    }
-
-    /**
      * get values.
      * 
-     * @return values
+     * @return
      */
     public Map<String, Object> get() {
         return values;
     }
 
+    /**
+     * set values
+     * 
+     * @param values
+     * @return
+     */
+    public RpcContext set(Map<String, Object> value) {
+        this.values.clear();
+        if (value != null && value.size() > 0) {
+            this.values.putAll(value);
+        }
+        return this;
+    }
+    
     /**
      * set value.
      * 
@@ -462,7 +339,7 @@ public class RpcContext {
         }
         return this;
     }
-
+    
     /**
      * remove value.
      * 
@@ -484,142 +361,84 @@ public class RpcContext {
         return values.get(key);
     }
 
-    public RpcContext setInvokers(List<Invoker<?>> invokers) {
-        this.invokers = invokers;
-        if (invokers != null && invokers.size() > 0) {
-            List<URL> urls = new ArrayList<URL>(invokers.size());
-            for (Invoker<?> invoker : invokers) {
-                urls.add(invoker.getUrl());
-            }
-            setUrls(urls);
+    /**
+     * get attachments.
+     * 
+     * @return
+     */
+    public Map<String, String> getAttachments() {
+        return attachments;
+    }
+
+    /**
+     * set attachments
+     * 
+     * @param attachment
+     * @return
+     */
+    public RpcContext setAttachments(Map<String, String> attachment) {
+        this.attachments.clear();
+        if (attachment != null && attachment.size() > 0) {
+            this.attachments.putAll(attachment);
+        }
+        return this;
+    }
+    
+    /**
+     * set attachment.
+     * 
+     * @param key
+     * @param value
+     * @return
+     */
+    public RpcContext setAttachment(String key, String value) {
+        if (value == null) {
+            attachments.remove(key);
+        } else {
+            attachments.put(key, value);
         }
         return this;
     }
 
-    public RpcContext setInvoker(Invoker<?> invoker) {
-        this.invoker = invoker;
-        if (invoker != null) {
-            setUrl(invoker.getUrl());
-        }
-        return this;
-    }
-
-    public RpcContext setInvocation(Invocation invocation) {
-        this.invocation = invocation;
-        if (invocation != null) {
-            setMethodName(invocation.getMethodName());
-            setParameterTypes(invocation.getParameterTypes());
-            setArguments(invocation.getArguments());
-        }
+    /**
+     * remove attachment.
+     * 
+     * @param key
+     * @return
+     */
+    public RpcContext removeAttachment(String key) {
+        attachments.remove(key);
         return this;
     }
 
     /**
-     * @deprecated Replace to isProviderSide()
+     * get attachment.
+     * 
+     * @param key
+     * @return
      */
-    @Deprecated
-    public boolean isServerSide() {
-        return isProviderSide();
-    }
-    
-    /**
-     * @deprecated Replace to isConsumerSide()
-     */
-    @Deprecated
-    public boolean isClientSide() {
-        return isConsumerSide();
-    }
-    
-    /**
-     * @deprecated Replace to getUrls()
-     */
-    @Deprecated
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    public List<Invoker<?>> getInvokers() {
-        return invokers == null && invoker != null ? (List)Arrays.asList(invoker) : invokers;
+    public Object getAttachment(String key) {
+        return attachments.get(key);
     }
 
     /**
-     * @deprecated Replace to getUrl()
-     */
-    @Deprecated
-    public Invoker<?> getInvoker() {
-        return invoker;
-    }
-
-    /**
-     * @deprecated Replace to getMethodName(), getParameterTypes(), getArguments()
-     */
-    @Deprecated
-    public Invocation getInvocation() {
-        return invocation;
-    }
-    
-    /**
-     * 异步调用 ，需要返回值，即使步调用Future.get方法，也会处理调用超时问题.
-     * @param callable
-     * @return 通过future.get()获取返回结果.
+     * get future.
+     * 
+     * @param <T>
+     * @return
      */
     @SuppressWarnings("unchecked")
-	public <T> Future<T> asyncCall(Callable<T> callable) {
-    	try {
-	    	try {
-	    		setAttachment(Constants.Attachments.IS_ASYNC_KEY, Boolean.TRUE.toString());
-				final T o = callable.call();
-				//local调用会直接返回结果.
-				if (o != null) {
-					FutureTask<T> f = new FutureTask<T>(new Callable<T>() {
-						public T call() throws Exception {
-							return o;
-						}
-					});
-					f.run();
-					return f;
-				} else {
-					
-				}
-			} catch (Exception e) {
-				throw new RpcException(e);
-			} finally {
-				removeAttachment(Constants.Attachments.IS_ASYNC_KEY);
-			}
-    	} catch (final RpcException e) {
-			return new Future<T>() {
-				public boolean cancel(boolean mayInterruptIfRunning) {
-					return false;
-				}
-				public boolean isCancelled() {
-					return false;
-				}
-				public boolean isDone() {
-					return true;
-				}
-				public T get() throws InterruptedException, ExecutionException {
-					throw new ExecutionException(e.getCause());
-				}
-				public T get(long timeout, TimeUnit unit)
-						throws InterruptedException, ExecutionException,
-						TimeoutException {
-					return get();
-				}
-			};
-		}
-    	return ((Future<T>)getContext().getFuture());
+    public <T> Future<T> getFuture() {
+        return (Future<T>) future;
+    }
+
+    /**
+     * set future.
+     * 
+     * @param future
+     */
+    public void setFuture(Future<?> future) {
+        this.future = future;
     }
     
-	/**
-	 * oneway调用，只发送请求，不接收返回结果.
-	 * @param callable
-	 */
-	public void asyncCall(Runnable runable) {
-    	try {
-    		setAttachment(Constants.Attachments.IS_ONEWAY_KEY, Boolean.TRUE.toString());
-    		runable.run();
-		} catch (Throwable e) {
-			//FIXME 异常是否应该放在future中？
-			throw new RpcException("oneway call error ." + e.getMessage(), e);
-		} finally {
-			removeAttachment(Constants.Attachments.IS_ONEWAY_KEY);
-		}
-    }
 }

@@ -17,14 +17,12 @@ package com.alibaba.dubbo.config;
 
 import java.util.List;
 
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.config.support.Parameter;
+import com.alibaba.dubbo.rpc.RpcConstants;
 
 /**
  * MethodConfig
  * 
  * @author william.liangf
- * @export
  */
 public class MethodConfig extends AbstractMethodConfig {
 
@@ -47,8 +45,8 @@ public class MethodConfig extends AbstractMethodConfig {
     
     // 是否过时
     private Boolean           deprecated;
-
-    // 是否需要开启stiky策略
+    
+    // 是否需要返回
     private Boolean           sticky;
 
     // 是否需要返回
@@ -82,9 +80,6 @@ public class MethodConfig extends AbstractMethodConfig {
     public void setName(String name) {
         checkMethodName("name", name);
         this.name = name;
-        if (id == null || id.length() == 0) {
-            id = name;
-        }
     }
     
     public Integer getStat() {
@@ -140,7 +135,7 @@ public class MethodConfig extends AbstractMethodConfig {
     public List<ArgumentConfig> getArguments() {
         return arguments;
     }
-    
+
     public Boolean getSticky() {
         return sticky;
     }
@@ -149,7 +144,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.sticky = sticky;
     }
 
-    @Parameter(key = Constants.ON_RETURN_INSTANCE_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_RETURN_INSTANCE_KEY, excluded = true, attribute = true)
     public Object getOnreturn() {
         return onreturn;
     }
@@ -158,7 +153,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.onreturn = onreturn;
     }
     
-    @Parameter(key = Constants.ON_RETURN_METHOD_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_RETURN_METHOD_KEY, excluded = true, attribute = true)
     public String getOnreturnMethod() {
         return onreturnMethod;
     }
@@ -167,7 +162,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.onreturnMethod = onreturnMethod;
     }
 
-    @Parameter(key = Constants.ON_THROW_INSTANCE_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_THROW_INSTANCE_KEY, excluded = true, attribute = true)
     public Object getOnthrow() {
         return onthrow;
     }
@@ -176,7 +171,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.onthrow = onthrow;
     }
     
-    @Parameter(key = Constants.ON_THROW_METHOD_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_THROW_METHOD_KEY, excluded = true, attribute = true)
     public String getOnthrowMethod() {
         return onthrowMethod;
     }
@@ -185,7 +180,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.onthrowMethod = onthrowMethod;
     }
     
-    @Parameter(key = Constants.ON_INVOKE_INSTANCE_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_INVOKE_INSTANCE_KEY, excluded = true, attribute = true)
     public Object getOninvoke() {
         return oninvoke;
     }
@@ -194,7 +189,7 @@ public class MethodConfig extends AbstractMethodConfig {
         this.oninvoke = oninvoke;
     }
     
-    @Parameter(key = Constants.ON_INVOKE_METHOD_KEY, excluded = true, attribute = true)
+    @Parameter(key = RpcConstants.ON_INVOKE_METHOD_KEY, excluded = true, attribute = true)
     public String getOninvokeMethod() {
         return oninvokeMethod;
     }
@@ -209,6 +204,5 @@ public class MethodConfig extends AbstractMethodConfig {
 
     public void setReturn(Boolean isReturn) {
         this.isReturn = isReturn;
-    }
-
+    }    
 }

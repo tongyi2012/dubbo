@@ -17,13 +17,11 @@ package com.alibaba.dubbo.config;
 
 import java.util.Map;
 
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
+import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.common.serialize.Serialization;
 import com.alibaba.dubbo.common.status.StatusChecker;
 import com.alibaba.dubbo.common.threadpool.ThreadPool;
-import com.alibaba.dubbo.config.support.Parameter;
 import com.alibaba.dubbo.registry.support.AbstractRegistryFactory;
-import com.alibaba.dubbo.remoting.Dispather;
 import com.alibaba.dubbo.remoting.Codec;
 import com.alibaba.dubbo.remoting.Transporter;
 import com.alibaba.dubbo.remoting.exchange.Exchanger;
@@ -34,7 +32,6 @@ import com.alibaba.dubbo.rpc.Protocol;
  * ProtocolConfig
  * 
  * @author william.liangf
- * @export
  */
 public class ProtocolConfig extends AbstractConfig {
 
@@ -81,9 +78,6 @@ public class ProtocolConfig extends AbstractConfig {
     
     // 缓存区大小
     private Integer             buffer;
-    
-    // 心跳间隔
-    private Integer             heartbeat;
 
     // 访问日志
     private String              accesslog;
@@ -94,12 +88,6 @@ public class ProtocolConfig extends AbstractConfig {
     // 信息交换方式
     private String              exchanger;
     
-    // 信息线程模型派发方式
-    private String              dispather;
-
-    // 对称网络组网方式
-    private String              networker;
-    
     // 服务器端实现
     private String              server;
     
@@ -108,32 +96,18 @@ public class ProtocolConfig extends AbstractConfig {
     
     // 支持的telnet命令，多个命令用逗号分隔
     private String              telnet;
-    
-    // 命令行提示符
-    private String              prompt;
 
     // status检查
     private String              status;
     
-    // 是否注册
-    private Boolean             register;
-    
     // 参数
     private Map<String, String> parameters;
-
-    // 是否为缺省
-    private Boolean isDefault;
     
     public ProtocolConfig() {
     }
     
     public ProtocolConfig(String name) {
         setName(name);
-    }
-
-    public ProtocolConfig(String name, int port) {
-        setName(name);
-        setPort(port);
     }
     
     @Parameter(excluded = true)
@@ -144,9 +118,6 @@ public class ProtocolConfig extends AbstractConfig {
     public void setName(String name) {
         checkName("name", name);
         this.name = name;
-        if (id == null || id.length() == 0) {
-            id = name;
-        }
     }
 
     @Parameter(excluded = true)
@@ -276,14 +247,6 @@ public class ProtocolConfig extends AbstractConfig {
         this.buffer = buffer;
     }
 
-    public Integer getHeartbeat() {
-        return heartbeat;
-    }
-
-    public void setHeartbeat(Integer heartbeat) {
-        this.heartbeat = heartbeat;
-    }
-
     public String getServer() {
         return server;
     }
@@ -323,15 +286,6 @@ public class ProtocolConfig extends AbstractConfig {
         this.telnet = telnet;
     }
 
-    @Parameter(escaped = true)
-    public String getPrompt() {
-        return prompt;
-    }
-
-    public void setPrompt(String prompt) {
-        this.prompt = prompt;
-    }
-
     public String getStatus() {
         return status;
     }
@@ -341,14 +295,6 @@ public class ProtocolConfig extends AbstractConfig {
         this.status = status;
     }
 
-    public Boolean isRegister() {
-        return register;
-    }
-    
-    public void setRegister(Boolean register) {
-        this.register = register;
-    }
-    
     public String getTransporter() {
         return transporter;
     }
@@ -367,37 +313,12 @@ public class ProtocolConfig extends AbstractConfig {
         this.exchanger = exchanger;
     }
 
-    public String getDispather() {
-        return dispather;
-    }
-
-    public void setDispather(String dispather) {
-        checkExtension(Dispather.class, "dispather", exchanger);
-        this.dispather = dispather;
-    }
-
-    public String getNetworker() {
-        return networker;
-    }
-
-    public void setNetworker(String networker) {
-        this.networker = networker;
-    }
-
     public Map<String, String> getParameters() {
         return parameters;
     }
 
     public void setParameters(Map<String, String> parameters) {
         this.parameters = parameters;
-    }
-
-    public Boolean isDefault() {
-        return isDefault;
-    }
-
-    public void setDefault(Boolean isDefault) {
-        this.isDefault = isDefault;
     }
 
     public void destory() {
@@ -408,17 +329,9 @@ public class ProtocolConfig extends AbstractConfig {
 
     public static void destroyAll() {
         AbstractRegistryFactory.destroyAll();
-        ExtensionLoader<Protocol> loader = ExtensionLoader.getExtensionLoader(Protocol.class);
-        for (String protocolName : loader.getLoadedExtensions()) {
-            try {
-                Protocol protocol = loader.getLoadedExtension(protocolName);
-                if (protocol != null) {
-                    protocol.destroy();
-                }
-            } catch (Throwable t) {
-                logger.warn(t.getMessage(), t);
-            }
+        for (String protocol : ExtensionLoader.getExtensionLoader(Protocol.class).getSupportedExtensions()) {
+            ExtensionLoader.getExtensionLoader(Protocol.class).getExtension(protocol).destroy();
         }
     }
-
+    
 }

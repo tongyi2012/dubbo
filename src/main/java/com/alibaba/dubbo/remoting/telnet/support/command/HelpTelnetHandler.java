@@ -18,8 +18,9 @@ package com.alibaba.dubbo.remoting.telnet.support.command;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.alibaba.dubbo.common.extension.Activate;
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
+import com.alibaba.dubbo.common.Constants;
+import com.alibaba.dubbo.common.Extension;
+import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.remoting.Channel;
 import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
 import com.alibaba.dubbo.remoting.telnet.support.Help;
@@ -30,18 +31,16 @@ import com.alibaba.dubbo.remoting.telnet.support.TelnetUtils;
  * 
  * @author william.liangf
  */
-@Activate
 @Help(parameter = "[command]", summary = "Show help.", detail = "Show help.")
+@Extension("help")
 public class HelpTelnetHandler implements TelnetHandler {
-    
-    private final ExtensionLoader<TelnetHandler> extensionLoader = ExtensionLoader.getExtensionLoader(TelnetHandler.class);
 
     public String telnet(Channel channel, String message) {
         if (message.length() > 0) {
-            if (! extensionLoader.hasExtension(message)) {
+            if (! ExtensionLoader.getExtensionLoader(TelnetHandler.class).hasExtension(message)) {
                 return "No such command " + message;
             }
-            TelnetHandler handler = extensionLoader.getExtension(message);
+            TelnetHandler handler = ExtensionLoader.getExtensionLoader(TelnetHandler.class).getExtension(message);
             Help help = handler.getClass().getAnnotation(Help.class);
             StringBuilder buf = new StringBuilder();
             buf.append("Command:\r\n    ");
@@ -53,12 +52,13 @@ public class HelpTelnetHandler implements TelnetHandler {
             return buf.toString();
         } else {
             List<List<String>> table = new ArrayList<List<String>>();
-            List<TelnetHandler> handlers = extensionLoader.getActivateExtension(channel.getUrl(), "telnet");
-            if (handlers != null && handlers.size() > 0) {
-                for (TelnetHandler handler : handlers) {
+            String telnet = channel.getUrl().getParameter("telnet");
+            if (telnet != null && telnet.length() > 0) {
+                for (String cmd : Constants.COMMA_SPLIT_PATTERN.split(telnet)) {
+                    TelnetHandler handler = ExtensionLoader.getExtensionLoader(TelnetHandler.class).getExtension(cmd);
                     Help help = handler.getClass().getAnnotation(Help.class);
                     List<String> row = new ArrayList<String>();
-                    String parameter = " " + extensionLoader.getExtensionName(handler) + " " + (help != null ? help.parameter().replace("\r\n", " ").replace("\n", " ") : "");
+                    String parameter = " " + cmd + " " + (help != null ? help.parameter().replace("\r\n", " ").replace("\n", " ") : "");
                     row.add(parameter.length() > 50 ? parameter.substring(0, 50) + "..." : parameter);
                     String summary = help != null ? help.summary().replace("\r\n", " ").replace("\n", " ") : "";
                     row.add(summary.length() > 50 ? summary.substring(0, 50) + "..." : summary);

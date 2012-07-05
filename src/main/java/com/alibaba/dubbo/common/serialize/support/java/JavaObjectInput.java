@@ -18,7 +18,6 @@ package com.alibaba.dubbo.common.serialize.support.java;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.lang.reflect.Type;
 
 import com.alibaba.dubbo.common.serialize.ObjectInput;
 
@@ -117,11 +116,5 @@ public class JavaObjectInput implements ObjectInput
 			ClassNotFoundException {
 		return (T) readObject();
 	}
-
-	@SuppressWarnings("unchecked")
-    public <T> T readObject(Class<T> cls, Type type) throws IOException,ClassNotFoundException
-    {
-        return (T) readObject();
-    }
 
 }

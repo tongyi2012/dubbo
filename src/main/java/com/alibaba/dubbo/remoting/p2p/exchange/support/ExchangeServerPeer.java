@@ -95,7 +95,7 @@ public class ExchangeServerPeer extends ExchangeServerDelegate implements Exchan
         if (channel == null) {
             for (Map.Entry<URL, ExchangeClient> entry : clients.entrySet()) {
                 URL url = entry.getKey();
-                if (url.getIp().equals(host) && url.getPort() == port) {
+                if (url.getHost().equals(host) && url.getPort() == port) {
                     return entry.getValue();
                 }
             }
@@ -105,7 +105,7 @@ public class ExchangeServerPeer extends ExchangeServerDelegate implements Exchan
 
     @Override
     public void send(Object message) throws RemotingException {
-        send(message, getUrl().getParameter(Constants.SENT_KEY, false));
+        send(message, getUrl().getBooleanParameter(Constants.SENT_KEY));
     }
 
     @Override

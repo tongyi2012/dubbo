@@ -15,18 +15,17 @@
  */
 package com.alibaba.dubbo.remoting;
 
-import com.alibaba.dubbo.common.extension.SPI;
-
 
 /**
  * ChannelHandler. (API, Prototype, ThreadSafe)
  * 
+ * @see com.alibaba.dubbo.remoting.exchange.Exchangers#bind(com.alibaba.dubbo.common.URL, ChannelHandler...)
  * @see com.alibaba.dubbo.remoting.Transporter#bind(com.alibaba.dubbo.common.URL, ChannelHandler)
+ * @see com.alibaba.dubbo.remoting.exchange.Exchangers#connect(com.alibaba.dubbo.common.URL, ChannelHandler...)
  * @see com.alibaba.dubbo.remoting.Transporter#connect(com.alibaba.dubbo.common.URL, ChannelHandler)
  * @author qian.lei
  * @author william.liangf
  */
-@SPI
 public interface ChannelHandler {
 
     /**

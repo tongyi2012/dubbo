@@ -17,7 +17,8 @@ package com.alibaba.dubbo.remoting.p2p.support;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+
+import org.jboss.netty.util.internal.ConcurrentHashMap;
 
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
@@ -29,7 +30,7 @@ import com.alibaba.dubbo.remoting.Server;
 import com.alibaba.dubbo.remoting.Transporters;
 import com.alibaba.dubbo.remoting.p2p.Group;
 import com.alibaba.dubbo.remoting.p2p.Peer;
-import com.alibaba.dubbo.remoting.transport.ChannelHandlerDispatcher;
+import com.alibaba.dubbo.remoting.transport.support.ChannelHandlerDispatcher;
 
 /**
  * AbstractGroup

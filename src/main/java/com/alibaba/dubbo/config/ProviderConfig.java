@@ -19,8 +19,6 @@ import java.util.Arrays;
 
 import com.alibaba.dubbo.common.status.StatusChecker;
 import com.alibaba.dubbo.common.threadpool.ThreadPool;
-import com.alibaba.dubbo.config.support.Parameter;
-import com.alibaba.dubbo.remoting.Dispather;
 import com.alibaba.dubbo.remoting.Transporter;
 import com.alibaba.dubbo.remoting.exchange.Exchanger;
 import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
@@ -31,7 +29,6 @@ import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
  * @see com.alibaba.dubbo.config.ProtocolConfig
  * @see com.alibaba.dubbo.config.ServiceConfig
  * @author william.liangf
- * @export
  */
 public class ProviderConfig extends AbstractServiceConfig {
 
@@ -83,12 +80,6 @@ public class ProviderConfig extends AbstractServiceConfig {
     
     // 信息交换方式
     private String              exchanger;
-
-    // 信息线程模型派发方式
-    private String              dispather;
-
-    // 对称网络组网方式
-    private String              networker;
     
     // 服务器端实现
     private String              server;
@@ -98,9 +89,6 @@ public class ProviderConfig extends AbstractServiceConfig {
     
     // 支持的telnet命令，多个命令用逗号分隔
     private String              telnet;
-
-    // 命令行提示符
-    private String              prompt;
 
     // status检查
     private String              status;
@@ -272,15 +260,6 @@ public class ProviderConfig extends AbstractServiceConfig {
         this.telnet = telnet;
     }
 
-    @Parameter(escaped = true)
-    public String getPrompt() {
-        return prompt;
-    }
-
-    public void setPrompt(String prompt) {
-        this.prompt = prompt;
-    }
-
     public String getStatus() {
         return status;
     }
@@ -290,36 +269,43 @@ public class ProviderConfig extends AbstractServiceConfig {
         this.status = status;
     }
 
+    @Parameter(key = "default.cluster")
     @Override
     public String getCluster() {
         return super.getCluster();
     }
 
+    @Parameter(key = "default.connections")
     @Override
     public Integer getConnections() {
         return super.getConnections();
     }
 
+    @Parameter(key = "default.timeout")
     @Override
     public Integer getTimeout() {
         return super.getTimeout();
     }
 
+    @Parameter(key = "default.retries")
     @Override
     public Integer getRetries() {
         return super.getRetries();
     }
 
+    @Parameter(key = "default.loadbalance")
     @Override
     public String getLoadbalance() {
         return super.getLoadbalance();
     }
 
+    @Parameter(key = "default.async")
     @Override
     public Boolean isAsync() {
         return super.isAsync();
     }
 
+    @Parameter(key = "default.actives")
     @Override
     public Integer getActives() {
         return super.getActives();
@@ -342,24 +328,7 @@ public class ProviderConfig extends AbstractServiceConfig {
         checkExtension(Exchanger.class, "exchanger", exchanger);
         this.exchanger = exchanger;
     }
-
-    public String getDispather() {
-        return dispather;
-    }
-
-    public void setDispather(String dispather) {
-        checkExtension(Dispather.class, "dispather", exchanger);
-        this.dispather = dispather;
-    }
-
-    public String getNetworker() {
-        return networker;
-    }
-
-    public void setNetworker(String networker) {
-        this.networker = networker;
-    }
-
+    
     public Integer getWait() {
         return wait;
     }

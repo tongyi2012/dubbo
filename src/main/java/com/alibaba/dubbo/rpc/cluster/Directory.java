@@ -23,11 +23,11 @@ import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.RpcException;
 
 /**
- * Directory. (SPI, Prototype, ThreadSafe)
+ * Directory. (SPI, Singleton, ThreadSafe)
  * 
  * <a href="http://en.wikipedia.org/wiki/Directory_service">Directory Service</a>
  * 
- * @see com.alibaba.dubbo.rpc.cluster.Cluster#join(Directory)
+ * @see com.alibaba.dubbo.rpc.cluster.Cluster#merge(Directory)
  * @author william.liangf
  */
 public interface Directory<T> extends Node {

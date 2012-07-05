@@ -25,28 +25,27 @@ import com.alibaba.dubbo.common.URL;
 /**
  * URL statistics. (API, Cached, ThreadSafe)
  * 
+ * @see com.alibaba.dubbo.rpc.filter.CountFilter
  * @see com.alibaba.dubbo.rpc.filter.ActiveLimitFilter
- * @see com.alibaba.dubbo.rpc.filter.ExecuteLimitFilter
- * @see com.alibaba.dubbo.rpc.cluster.loadbalance.LeastActiveLoadBalance
+ * @see com.alibaba.dubbo.routing.loadbalance.LeastActiveLoadBalance
  * @author william.liangf
  */
 public class RpcStatus {
 
-    private static final ConcurrentMap<String, RpcStatus> SERVICE_STATISTICS = new ConcurrentHashMap<String, RpcStatus>();
+    private static final ConcurrentMap<URL, RpcStatus> SERVICE_STATISTICS = new ConcurrentHashMap<URL, RpcStatus>();
 
-    private static final ConcurrentMap<String, ConcurrentMap<String, RpcStatus>> METHOD_STATISTICS = new ConcurrentHashMap<String, ConcurrentMap<String, RpcStatus>>();
+    private static final ConcurrentMap<URL, ConcurrentMap<String, RpcStatus>> METHOD_STATISTICS = new ConcurrentHashMap<URL, ConcurrentMap<String, RpcStatus>>();
 
     /**
      * 
      * @param url
-     * @return status
+     * @return
      */
     public static RpcStatus getStatus(URL url) {
-        String uri = url.toIdentityString();
-        RpcStatus status = SERVICE_STATISTICS.get(uri);
+        RpcStatus status = SERVICE_STATISTICS.get(url);
         if (status == null) {
-            SERVICE_STATISTICS.putIfAbsent(uri, new RpcStatus());
-            status = SERVICE_STATISTICS.get(uri);
+            SERVICE_STATISTICS.putIfAbsent(url, new RpcStatus());
+            status = SERVICE_STATISTICS.get(url);
         }
         return status;
     }
@@ -56,22 +55,20 @@ public class RpcStatus {
      * @param url
      */
     public static void removeStatus(URL url) {
-        String uri = url.toIdentityString();
-        SERVICE_STATISTICS.remove(uri);
+        SERVICE_STATISTICS.remove(url);
     }
     
     /**
      * 
      * @param url
      * @param methodName
-     * @return status
+     * @return
      */
     public static RpcStatus getStatus(URL url, String methodName) {
-        String uri = url.toIdentityString();
-        ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(uri);
+        ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(url);
         if (map == null) {
-            METHOD_STATISTICS.putIfAbsent(uri, new ConcurrentHashMap<String, RpcStatus>());
-            map = METHOD_STATISTICS.get(uri);
+            METHOD_STATISTICS.putIfAbsent(url, new ConcurrentHashMap<String, RpcStatus>());
+            map = METHOD_STATISTICS.get(url);
         }
         RpcStatus status = map.get(methodName);
         if (status == null) {
@@ -86,8 +83,7 @@ public class RpcStatus {
      * @param url
      */
     public static void removeStatus(URL url, String methodName) {
-        String uri = url.toIdentityString();
-        ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(uri);
+        ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(url);
         if (map != null) {
             map.remove(methodName);
         }
@@ -155,6 +151,8 @@ public class RpcStatus {
 
     private final AtomicLong succeededMaxElapsed = new AtomicLong();
     
+    private volatile boolean ready = true;
+
     private RpcStatus() {}
 
     /**
@@ -305,17 +303,21 @@ public class RpcStatus {
     public long getSucceededMaxElapsed() {
         return succeededMaxElapsed.get();
     }
-
+    
     /**
-     * Calculate average TPS (Transaction per second).
-     *
-     * @return tps
+     * 
+     * @return
      */
-    public long getAverageTps() {
-        if (getTotalElapsed() >= 1000L) {
-            return getTotal() / (getTotalElapsed() / 1000L);
-        }
-        return getTotal();
+    public boolean isReady() {
+        return ready;
+    }
+    
+    /**
+     * 
+     * @param ready
+     */
+    public void setReady(boolean ready) {
+        this.ready = ready;
     }
 
 }

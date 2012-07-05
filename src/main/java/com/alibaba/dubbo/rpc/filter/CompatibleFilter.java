@@ -19,6 +19,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 
 import com.alibaba.dubbo.common.Constants;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.CompatibleTypeUtils;
@@ -35,6 +36,7 @@ import com.alibaba.dubbo.rpc.RpcResult;
  * 
  * @author william.liangf
  */
+@Extension("compatible")
 public class CompatibleFilter implements Filter {
     
     private static Logger logger = LoggerFactory.getLogger(CompatibleFilter.class);
@@ -42,7 +44,7 @@ public class CompatibleFilter implements Filter {
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
         Result result = invoker.invoke(invocation);
         if (! invocation.getMethodName().startsWith("$") && ! result.hasException()) {
-            Object value = result.getValue();
+            Object value = result.getResult();
             if (value != null) {
                 try {
                     Method method = invoker.getInterface().getMethod(invocation.getMethodName(), invocation.getParameterTypes());

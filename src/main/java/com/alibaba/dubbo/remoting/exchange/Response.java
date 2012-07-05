@@ -22,10 +22,6 @@ package com.alibaba.dubbo.remoting.exchange;
  * @author william.liangf
  */
 public class Response {
-    
-    public static final String HEARTBEAT_EVENT = null;
-    
-    public static final String READONLY_EVENT = "R";
 
     /**
      * ok.
@@ -46,11 +42,6 @@ public class Response {
      * request format error.
      */
     public static final byte BAD_REQUEST       = 40;
-
-    /**
-     * response format error.
-     */
-    public static final byte BAD_RESPONSE      = 50;
 
     /**
      * service not found.
@@ -78,7 +69,7 @@ public class Response {
 
     private byte             mStatus           = OK;
 
-    private boolean          mEvent         = false;
+    private boolean          mHeatbeat         = false;
 
     private String           mErrorMsg;
 
@@ -119,25 +110,13 @@ public class Response {
     public void setStatus(byte status) {
         mStatus = status;
     }
-    
-    public boolean isEvent() {
-        return mEvent;
-    }
-
-    public void setEvent(String event) {
-        mEvent = true;
-        mResult = event;
-    }
 
     public boolean isHeartbeat() {
-        return mEvent && HEARTBEAT_EVENT == mResult;
+        return mHeatbeat;
     }
 
-    @Deprecated
-    public void setHeartbeat(boolean isHeartbeat) {
-        if (isHeartbeat) {
-            setEvent(HEARTBEAT_EVENT);
-        }
+    public void setHeartbeat(boolean isHeatbeat) {
+        this.mHeatbeat = isHeatbeat;
     }
 
     public Object getResult() {
@@ -158,7 +137,7 @@ public class Response {
 
     @Override
     public String toString() {
-        return "Response [id=" + mId + ", version=" + mVersion + ", status=" + mStatus + ", event=" + mEvent
+        return "Response [id=" + mId + ", version=" + mVersion + ", status=" + mStatus + ", heatbeat=" + mHeatbeat
                + ", error=" + mErrorMsg + ", result=" + (mResult == this ? "this" : mResult) + "]";
     }
 }

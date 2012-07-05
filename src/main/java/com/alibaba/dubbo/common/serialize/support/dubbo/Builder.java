@@ -38,6 +38,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 
 import com.alibaba.dubbo.common.bytecode.ClassGenerator;
+import com.alibaba.dubbo.common.io.ClassDescriptorMapper;
 import com.alibaba.dubbo.common.io.UnsafeByteArrayInputStream;
 import com.alibaba.dubbo.common.io.UnsafeByteArrayOutputStream;
 import com.alibaba.dubbo.common.logger.Logger;
@@ -194,7 +195,7 @@ public abstract class Builder<T> implements GenericDataFlags
 		if( cc.isInterface() )
 			return GenericArrayBuilder;
 
-		ClassLoader cl = ClassHelper.getCallerClassLoader(Builder.class);
+		ClassLoader cl = ClassHelper.getClassLoader(c);
 
 		String cn = ReflectUtils.getName(c), ccn = ReflectUtils.getName(cc); // get class name as int[][], double[].
 		String bcn = BUILDER_CLASS_NAME + "$bc" + BUILDER_CLASS_COUNTER.getAndIncrement();
@@ -311,7 +312,7 @@ public abstract class Builder<T> implements GenericDataFlags
 		if( Throwable.class.isAssignableFrom(c) )
 			return SerializableBuilder;
 
-		ClassLoader cl = ClassHelper.getCallerClassLoader(Builder.class);
+		ClassLoader cl = ClassHelper.getClassLoader(c);
 	
 		// is same package.
 		boolean isp;
@@ -382,7 +383,7 @@ public abstract class Builder<T> implements GenericDataFlags
 				{
 					f = c.getDeclaredField(fn);
 					int mod = f.getModifiers();
-					if( Modifier.isStatic(mod) || (serializeIgnoreFinalModifier(c) && Modifier.isFinal(mod)) )
+					if( Modifier.isStatic(mod) || Modifier.isFinal(mod) )
 						throw new RuntimeException("Field [" + c.getName() + "." + fn + "] is static/final field.");
 					if( Modifier.isTransient(mod) )
 					{
@@ -413,10 +414,7 @@ public abstract class Builder<T> implements GenericDataFlags
 				for( Field tf : fs )
 				{
 					int mod = tf.getModifiers();
-                    if (Modifier.isStatic(mod)
-                            || (serializeIgnoreFinalModifier(c) && Modifier.isFinal(mod))
-                            || tf.getName().equals("this$0") // skip static or inner-class's 'this$0' field.
-                            || ! Modifier.isPublic(tf.getType().getModifiers()) ) //skip private inner-class field
+					if( Modifier.isStatic(mod) || Modifier.isFinal(mod) || tf.getName().equals("this$0") ) // skip static or inner-class's 'this$0' field.
 						continue;
 					if( Modifier.isTransient(mod) )
 					{
@@ -758,7 +756,7 @@ public abstract class Builder<T> implements GenericDataFlags
 
 	private static Builder<?> newEnumBuilder(Class<?> c)
 	{
-		ClassLoader cl = ClassHelper.getCallerClassLoader(Builder.class);
+		ClassLoader cl = ClassHelper.getClassLoader(c);
 		
 		String cn = c.getName();
 		String bcn = BUILDER_CLASS_NAME + "$bc" + BUILDER_CLASS_COUNTER.getAndIncrement();
@@ -859,33 +857,10 @@ public abstract class Builder<T> implements GenericDataFlags
 	{
 		return s.length() == 1 || Character.isLowerCase(s.charAt(1)) ? Character.toLowerCase(s.charAt(0)) + s.substring(1) : s;
 	}
-	
-	private static boolean serializeIgnoreFinalModifier(Class cl)
-    {
-//	    if (cl.isAssignableFrom(BigInteger.class)) return false;
-//	    for performance
-//	    if (cl.getName().startsWith("java")) return true;
-//	    if (cl.getName().startsWith("javax")) return true;
-	    
-	    return false;
-    }
-	
-	@SuppressWarnings("unused")
-    private static boolean isPrimitiveOrPrimitiveArray1(Class<?> cl)
-    {
-        if (cl.isPrimitive()){
-            return true;
-        } else {
-            Class clazz = cl.getClass().getComponentType();
-            if (clazz!=null && clazz.isPrimitive()){
-                return true;
-            }
-        } 
-        return false;
-    }
 
 	private static String defaultArg(Class<?> cl)
 	{
+	    if( !cl.isPrimitive() ) return "null";
 	    if( boolean.class == cl ) return "false";
 	    if( int.class == cl ) return "0";
 	    if( long.class == cl ) return "0l";
@@ -894,8 +869,6 @@ public abstract class Builder<T> implements GenericDataFlags
 	    if( short.class == cl ) return "(short)0";
 	    if( char.class == cl ) return "(char)0";
 	    if( byte.class == cl ) return "(byte)0";
-	    if( byte[].class == cl ) return "new byte[]{0}";
-	    if( !cl.isPrimitive() ) return "null";
 	    throw new UnsupportedOperationException();
 	}
 

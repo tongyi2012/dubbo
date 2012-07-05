@@ -29,7 +29,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.extension.Activate;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.json.JSON;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
@@ -37,20 +37,20 @@ import com.alibaba.dubbo.common.utils.ConcurrentHashSet;
 import com.alibaba.dubbo.common.utils.ConfigUtils;
 import com.alibaba.dubbo.common.utils.NamedThreadFactory;
 import com.alibaba.dubbo.rpc.Filter;
-import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
-import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcContext;
 import com.alibaba.dubbo.rpc.RpcException;
+import com.alibaba.dubbo.rpc.Invocation;
+import com.alibaba.dubbo.rpc.Result;
 
 /**
  * 记录Service的Access Log。
  * <p>
- * 使用的Logger key是<code><b>dubbo.accesslog</b></code>。
- * 如果想要配置Access Log只出现在指定的Appender中，可以在Log4j中注意配置上additivity。配置示例:
+ * 使用的Logger key是<code><b>DUBBO.ACCESS-LOG</b></code>。
+ * 如果要配置Access Log只出现在指定的Appender中，在Log4j中注意配置上additivity。配置示例:
  * <code>
  * <pre>
- * &lt;logger name="<b>dubbo.accesslog</b>" <font color="red">additivity="false"</font>&gt;
+ * &lt;logger name="<b>DUBBO.ACCESS-LOG</b>" <font color="red">additivity="false"</font>&gt;
  *    &lt;level value="info" /&gt;
  *    &lt;appender-ref ref="foo" /&gt;
  * &lt;/logger&gt;
@@ -58,7 +58,7 @@ import com.alibaba.dubbo.rpc.RpcException;
  * 
  * @author ding.lid
  */
-@Activate(group = Constants.PROVIDER, value = Constants.ACCESS_LOG_KEY)
+@Extension("accesslog")
 public class AccessLogFilter implements Filter {
     
     private static final Logger logger            = LoggerFactory.getLogger(AccessLogFilter.class);
@@ -89,7 +89,7 @@ public class AccessLogFilter implements Filter {
                             Set<String> logSet = entry.getValue();
                             File file = new File(accesslog);
                             File dir = file.getParentFile();
-                            if (null!=dir&&! dir.exists()) {
+                            if (! dir.exists()) {
                                 dir.mkdirs();
                             }
                             if (logger.isDebugEnabled()) {

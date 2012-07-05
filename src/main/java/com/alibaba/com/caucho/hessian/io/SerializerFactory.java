@@ -50,7 +50,6 @@ package com.alibaba.com.caucho.hessian.io;
 
 import java.io.*;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -599,8 +598,6 @@ public class SerializerFactory extends AbstractSerializerFactory
     try {
       _staticDeserializerMap.put(BigDecimal.class,
 			   new StringValueDeserializer(BigDecimal.class));
-      _staticDeserializerMap.put(BigInteger.class,
-               new BigIntegerDeserializer());
     } catch (Throwable e) {
     }
     

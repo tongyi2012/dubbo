@@ -15,24 +15,14 @@
  */
 package com.alibaba.dubbo.common.utils;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.net.URL;
 import java.security.CodeSource;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,8 +36,9 @@ import javassist.NotFoundException;
  * 
  * @author qian.lei
  */
-public final class ReflectUtils {
-    
+
+public final class ReflectUtils
+{
 	/**
 	 * void(V).
 	 */
@@ -116,45 +107,7 @@ public final class ReflectUtils {
 	public static final Pattern SETTER_METHOD_DESC_PATTERN = Pattern.compile("set([A-Z][_a-zA-Z0-9]*)\\((" + DESC_REGEX + ")\\)V");
 
 	public static final Pattern IS_HAS_CAN_METHOD_DESC_PATTERN = Pattern.compile("(?:is|has|can)([A-Z][_a-zA-Z0-9]*)\\(\\)Z");
-	
-	private static final ConcurrentMap<String, Class<?>>  DESC_CLASS_CACHE = new ConcurrentHashMap<String, Class<?>>();
-    
-	private static final ConcurrentMap<String, Class<?>>  NAME_CLASS_CACHE = new ConcurrentHashMap<String, Class<?>>();
-	    
-	private static final ConcurrentMap<String, Method>  Signature_METHODS_CACHE = new ConcurrentHashMap<String, Method>();
-	
-	public static boolean isPrimitives(Class<?> cls) {
-        if (cls.isArray()) {
-            return isPrimitive(cls.getComponentType());
-        }
-        return isPrimitive(cls);
-    }
-    
-	public static boolean isPrimitive(Class<?> cls) {
-        return cls.isPrimitive() || cls == String.class || cls == Boolean.class || cls == Character.class 
-                || Number.class.isAssignableFrom(cls) || Date.class.isAssignableFrom(cls);
-    }
-	
-	public static Class<?> getBoxedClass(Class<?> c) {
-	    if( c == int.class )
-            c = Integer.class;
-        else if( c == boolean.class )
-            c = Boolean.class;
-        else  if( c == long.class )
-            c = Long.class;
-        else if( c == float.class )
-            c = Float.class;
-        else if( c == double.class )
-            c = Double.class;
-        else if( c == char.class )
-            c = Character.class;
-        else if( c == byte.class )
-            c = Byte.class;
-        else if( c == short.class )
-            c = Short.class;
-	    return c;
-	}
-	
+
 	/**
 	 * is compatible.
 	 * 
@@ -247,29 +200,6 @@ public final class ReflectUtils {
 		}
 		return c.getName();
 	}
-	
-    
-    public static Class<?> getGenericClass(Class<?> cls) {
-        return getGenericClass(cls, 0);
-    }
-
-    public static Class<?> getGenericClass(Class<?> cls, int i) {
-        try {
-            ParameterizedType parameterizedType = ((ParameterizedType) cls.getGenericInterfaces()[0]);
-            Object genericClass = parameterizedType.getActualTypeArguments()[i];
-            if (genericClass instanceof ParameterizedType) { // 处理多级泛型
-                return (Class<?>) ((ParameterizedType) genericClass).getRawType();
-            } else if (genericClass instanceof GenericArrayType) { // 处理数组泛型
-                return (Class<?>) ((GenericArrayType) genericClass).getGenericComponentType();
-            } else {
-                return (Class<?>) genericClass;
-            }
-        } catch (Throwable e) {
-            throw new IllegalArgumentException(cls.getName()
-                    + " generic type undefined!", e);
-        }
-    }
-
 
 	/**
 	 * get method name.
@@ -633,7 +563,7 @@ public final class ReflectUtils {
 	 * @param name name.
 	 * @return Class instance.
 	 */
-	private static Class<?> name2class(ClassLoader cl, String name) throws ClassNotFoundException
+	public static Class<?> name2class(ClassLoader cl, String name) throws ClassNotFoundException
 	{
 		int c = 0, index = name.indexOf('[');
 		if( index > 0 )
@@ -674,12 +604,7 @@ public final class ReflectUtils {
 
 		if( cl == null )
 			cl = ClassHelper.getClassLoader();
-		Class<?> clazz = NAME_CLASS_CACHE.get(name);
-        if(clazz == null){
-            clazz = Class.forName(name, true, cl);
-            NAME_CLASS_CACHE.put(name, clazz);
-        }
-        return clazz;
+		return Class.forName(name, true, cl);
 	}
 
 	/**
@@ -706,7 +631,7 @@ public final class ReflectUtils {
 	 * @return Class instance.
 	 * @throws ClassNotFoundException 
 	 */
-	private static Class<?> desc2class(ClassLoader cl, String desc) throws ClassNotFoundException
+	public static Class<?> desc2class(ClassLoader cl, String desc) throws ClassNotFoundException
 	{
 		switch( desc.charAt(0) )
 		{
@@ -731,12 +656,7 @@ public final class ReflectUtils {
 
 		if( cl == null )
 			cl = ClassHelper.getClassLoader();
-		Class<?> clazz = DESC_CLASS_CACHE.get(desc);
-		if(clazz==null){
-		    clazz = Class.forName(desc, true, cl);
-		    DESC_CLASS_CACHE.put(desc, clazz);
-		}
-		return clazz;
+		return Class.forName(desc, true, cl);
 	}
 
 	/**
@@ -748,8 +668,7 @@ public final class ReflectUtils {
 	 */
 	public static Class<?>[] desc2classArray(String desc) throws ClassNotFoundException
 	{
-	    Class<?>[] ret = desc2classArray(ClassHelper.getClassLoader(), desc);
-		return ret;
+		return desc2classArray(ClassHelper.getClassLoader(), desc);
 	}
 
 	/**
@@ -760,7 +679,7 @@ public final class ReflectUtils {
 	 * @return Class[] class array.
 	 * @throws ClassNotFoundException 
 	 */
-	private static Class<?>[] desc2classArray(ClassLoader cl, String desc) throws ClassNotFoundException
+	public static Class<?>[] desc2classArray(ClassLoader cl, String desc) throws ClassNotFoundException
 	{
 		if( desc.length() == 0 )
 			return EMPTY_CLASS_ARRAY;
@@ -776,7 +695,7 @@ public final class ReflectUtils {
 	 * 根据方法签名从类中找出方法。
 	 * 
 	 * @param clazz 查找的类。
-	 * @param methodName 方法签名，形如method1(int, String)。也允许只给方法名不参数只有方法名，形如method2。
+	 * @param methodSignature 方法签名，形如method1(int, String)。也允许只给方法名不参数只有方法名，形如method2。
 	 * @return 返回查找到的方法。
 	 * @throws NoSuchMethodException
 	 * @throws ClassNotFoundException  
@@ -784,15 +703,7 @@ public final class ReflectUtils {
 	 */
 	public static Method findMethodByMethodSignature(Class<?> clazz, String methodName, String[] parameterTypes)
 	        throws NoSuchMethodException, ClassNotFoundException {
-	    String signature = methodName;
-        if(parameterTypes != null && parameterTypes.length > 0){
-            signature = methodName + StringUtils.join(parameterTypes);
-        }
-        Method method = Signature_METHODS_CACHE.get(signature);
-        if(method != null){
-            return method;
-        }
-	    if (parameterTypes == null) {
+        if (parameterTypes == null) {
             List<Method> finded = new ArrayList<Method>();
             for (Method m : clazz.getMethods()) {
                 if (m.getName().equals(methodName)) {
@@ -807,17 +718,14 @@ public final class ReflectUtils {
                         methodName, clazz.getName(), finded.size());
                 throw new IllegalStateException(msg);
             }
-            method = finded.get(0);
+            return finded.get(0);
         } else {
             Class<?>[] types = new Class<?>[parameterTypes.length];
             for (int i = 0; i < parameterTypes.length; i ++) {
                 types[i] = ReflectUtils.name2class(parameterTypes[i]);
             }
-            method = clazz.getMethod(methodName, types);
-            
+            return clazz.getMethod(methodName, types);
         }
-	    Signature_METHODS_CACHE.put(signature, method);
-        return method;
 	}
 
     public static Method findMethodByMethodName(Class<?> clazz, String methodName)
@@ -846,145 +754,6 @@ public final class ReflectUtils {
 		}
 		return targetConstructor;
     }
-
-    /**
-     * 检查对象是否是指定接口的实现。
-     * <p>
-     * 不会触发到指定接口的{@link Class}，所以如果ClassLoader中没有指定接口类时，也不会出错。
-     * 
-     * @param obj 要检查的对象
-     * @param interfaceClazzName 指定的接口名
-     * @return 返回{@code true}，如果对象实现了指定接口；否则返回{@code false}。
-     */
-    public static boolean isInstance(Object obj, String interfaceClazzName) {
-        for (Class<?> clazz = obj.getClass(); 
-                clazz != null && !clazz.equals(Object.class); 
-                clazz = clazz.getSuperclass()) {
-            Class<?>[] interfaces = clazz.getInterfaces();
-            for (Class<?> itf : interfaces) {
-                if (itf.getName().equals(interfaceClazzName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
     
-    public static Object getEmptyObject(Class<?> returnType) {
-        return getEmptyObject(returnType, new HashMap<Class<?>, Object>(), 0);
-    }
-    
-    private static Object getEmptyObject(Class<?> returnType, Map<Class<?>, Object> emptyInstances, int level) {
-        if (level > 2)
-            return null;
-        if (returnType == null) {
-            return null;
-        } else if (returnType == boolean.class || returnType == Boolean.class) {
-            return false;
-        } else if (returnType == char.class || returnType == Character.class) {
-            return '\0';
-        } else if (returnType == byte.class || returnType == Byte.class) {
-            return (byte)0;
-        } else if (returnType == short.class || returnType == Short.class) {
-            return (short)0;
-        } else if (returnType == int.class || returnType == Integer.class) {
-            return 0;
-        } else if (returnType == long.class || returnType == Long.class) {
-            return 0L;
-        } else if (returnType == float.class || returnType == Float.class) {
-            return 0F;
-        } else if (returnType == double.class || returnType == Double.class) {
-            return 0D;
-        } else if (returnType.isArray()) {
-            return Array.newInstance(returnType.getComponentType(), 0);
-        } else if (returnType.isAssignableFrom(ArrayList.class)) {
-            return new ArrayList<Object>(0);
-        } else if (returnType.isAssignableFrom(HashSet.class)) {
-            return new HashSet<Object>(0);
-        } else if (returnType.isAssignableFrom(HashMap.class)) {
-            return new HashMap<Object, Object>(0);
-        } else if (String.class.equals(returnType)) {
-            return "";
-        } else if (! returnType.isInterface()) {
-            try {
-                Object value = emptyInstances.get(returnType);
-                if (value == null) {
-                    value = returnType.newInstance();
-                    emptyInstances.put(returnType, value);
-                }
-                Class<?> cls = value.getClass();
-                while (cls != null && cls != Object.class) {
-                    Field[] fields = cls.getDeclaredFields();
-                    for (Field field : fields) {
-                        Object property = getEmptyObject(field.getType(), emptyInstances, level + 1);
-                        if (property != null) {
-                            try {
-                                if (! field.isAccessible()) {
-                                    field.setAccessible(true);
-                                }
-                                field.set(value, property);
-                            } catch (Throwable e) {
-                            }
-                        }
-                    }
-                    cls = cls.getSuperclass();
-                }
-                return value;
-            } catch (Throwable e) {
-                return null;
-            }
-        } else {
-            return null;
-        }
-    }
-
-    public static boolean isBeanPropertyReadMethod(Method method) {
-        return method != null
-            && Modifier.isPublic(method.getModifiers())
-            && ! Modifier.isStatic(method.getModifiers())
-            && method.getReturnType() != void.class
-            && method.getDeclaringClass() != Object.class
-            && method.getParameterTypes().length == 0
-            && (method.getName().startsWith("get") || method.getName().startsWith("is"));
-    }
-
-    public static String getPropertyNameFromBeanReadMethod(Method method) {
-        if (isBeanPropertyReadMethod(method)) {
-            if (method.getName().startsWith("get")) {
-                return method.getName().substring(3, 4).toLowerCase()
-                    + method.getName().substring(4);
-            }
-            if (method.getName().startsWith("is")) {
-                return method.getName().substring(2, 3).toLowerCase()
-                    + method.getName().substring(3);
-            }
-        }
-        return null;
-    }
-
-    public static boolean isBeanPropertyWriteMethod(Method method) {
-        return method != null
-            && Modifier.isPublic(method.getModifiers())
-            && ! Modifier.isStatic(method.getModifiers())
-            && method.getDeclaringClass() != Object.class
-            && method.getParameterTypes().length == 1
-            && method.getName().startsWith("set");
-    }
-    
-    public static String getPropertyNameFromBeanWriteMethod(Method method) {
-        if (isBeanPropertyWriteMethod(method)) {
-            return method.getName().substring(3, 4).toLowerCase()
-                + method.getName().substring(4);
-        }
-        return null;
-    }
-
-    public static boolean isPublicInstanceField(Field field) {
-        return Modifier.isPublic(field.getModifiers())
-            && !Modifier.isStatic(field.getModifiers())
-            && !Modifier.isFinal(field.getModifiers())
-            && !field.isSynthetic();
-    }
-
 	private ReflectUtils(){}
 }

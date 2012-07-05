@@ -15,24 +15,21 @@
  */
 package com.alibaba.dubbo.rpc;
 
-import com.alibaba.dubbo.common.extension.SPI;
+import com.alibaba.dubbo.common.Extension;
 
 /**
  * Filter. (SPI, Singleton, ThreadSafe)
  * 
  * @author william.liangf
  */
-@SPI
+@Extension
 public interface Filter {
 
 	/**
 	 * do invoke filter.
 	 * 
 	 * <code>
-	 * // before filter
-     * Result result = invoker.invoke(invocation);
-     * // after filter
-     * return result;
+     *     return invoker.invoke(invocation);
      * </code>
      * 
      * @see com.alibaba.dubbo.rpc.Invoker#invoke(Invocation)

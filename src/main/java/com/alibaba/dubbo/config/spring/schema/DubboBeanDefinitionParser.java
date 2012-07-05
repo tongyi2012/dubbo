@@ -18,9 +18,6 @@ package com.alibaba.dubbo.config.spring.schema;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -33,31 +30,23 @@ import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.beans.factory.xml.BeanDefinitionParser;
 import org.springframework.beans.factory.xml.ParserContext;
 import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
+import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
-import com.alibaba.dubbo.common.utils.ReflectUtils;
-import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.config.ArgumentConfig;
 import com.alibaba.dubbo.config.MethodConfig;
-import com.alibaba.dubbo.config.MonitorConfig;
 import com.alibaba.dubbo.config.ProtocolConfig;
-import com.alibaba.dubbo.config.ProviderConfig;
 import com.alibaba.dubbo.config.RegistryConfig;
-import com.alibaba.dubbo.config.spring.ReferenceBean;
-import com.alibaba.dubbo.config.spring.ServiceBean;
 import com.alibaba.dubbo.rpc.Protocol;
 
 /**
  * AbstractBeanDefinitionParser
  * 
  * @author william.liangf
- * @export
  */
 public class DubboBeanDefinitionParser implements BeanDefinitionParser {
     
@@ -75,8 +64,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
     public BeanDefinition parse(Element element, ParserContext parserContext) {
         return parse(element, parserContext, beanClass, required);
     }
-    
-    @SuppressWarnings("unchecked")
+
     private static BeanDefinition parse(Element element, ParserContext parserContext, Class<?> beanClass, boolean required) {
         RootBeanDefinition beanDefinition = new RootBeanDefinition();
         beanDefinition.setBeanClass(beanClass);
@@ -85,11 +73,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         if ((id == null || id.length() == 0) && required) {
         	String generatedBeanName = element.getAttribute("name");
         	if (generatedBeanName == null || generatedBeanName.length() == 0) {
-        	    if (ProtocolConfig.class.equals(beanClass)) {
-        	        generatedBeanName = "dubbo";
-        	    } else {
-        	        generatedBeanName = element.getAttribute("interface");
-        	    }
+        		generatedBeanName = element.getAttribute("interface");
         	}
         	if (generatedBeanName == null || generatedBeanName.length() == 0) {
         		generatedBeanName = beanClass.getName();
@@ -105,7 +89,6 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         		throw new IllegalStateException("Duplicate spring bean id " + id);
         	}
             parserContext.getRegistry().registerBeanDefinition(id, beanDefinition);
-            beanDefinition.getPropertyValues().addPropertyValue("id", id);
         }
         if (ProtocolConfig.class.equals(beanClass)) {
             for (String name : parserContext.getRegistry().getBeanDefinitionNames()) {
@@ -118,30 +101,14 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     }
                 }
             }
-        } else if (ServiceBean.class.equals(beanClass)) {
-            String className = element.getAttribute("class");
-            if(className != null && className.length() > 0) {
-                RootBeanDefinition classDefinition = new RootBeanDefinition();
-                classDefinition.setBeanClass(ReflectUtils.forName(className));
-                classDefinition.setLazyInit(false);
-                parseProperties(element.getChildNodes(), classDefinition);
-                beanDefinition.getPropertyValues().addPropertyValue("ref", new BeanDefinitionHolder(classDefinition, id + "Impl"));
-            }
-        } else if (ProviderConfig.class.equals(beanClass)) {
-            parseNested(element, parserContext, ServiceBean.class, true, "service", "provider", id, beanDefinition);
-        } else if (ProviderConfig.class.equals(beanClass)) {
-            parseNested(element, parserContext, ReferenceBean.class, false, "reference", "consumer", id, beanDefinition);
         }
-        Set<String> props = new HashSet<String>();
-        ManagedMap parameters = null;
         for (Method setter : beanClass.getMethods()) {
             String name = setter.getName();
             if (name.length() > 3 && name.startsWith("set")
                     && Modifier.isPublic(setter.getModifiers())
                     && setter.getParameterTypes().length == 1) {
                 Class<?> type = setter.getParameterTypes()[0];
-                String property = StringUtils.camelToSplitName(name.substring(3, 4).toLowerCase() + name.substring(4), "-");
-                props.add(property);
+                String property = name.substring(3, 4).toLowerCase() + name.substring(4);
                 Method getter = null;
                 try {
                     getter = beanClass.getMethod("get" + name.substring(3), new Class<?>[0]);
@@ -157,7 +124,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     continue;
                 }
                 if ("parameters".equals(property)) {
-                    parameters = parseParameters(element.getChildNodes(), beanDefinition);
+                    parseParameters(element.getChildNodes(), beanDefinition);
                 } else if ("methods".equals(property)) {
                     parseMethods(id, element.getChildNodes(), beanDefinition, parserContext);
                 } else if ("arguments".equals(property)) {
@@ -190,6 +157,21 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                         value = null;
                                     }
                                     reference = value;
+                                    if (! "id".equals(property) 
+                                            && ! "name".equals(property) 
+                                            && ! "interface".equals(property)) {
+                                        String sysProperty = element.getPrefix() + "." + element.getLocalName() + "." + id + "." + property;
+                                        String sysValue = System.getProperty(sysProperty);
+                                        if (sysValue != null && sysValue.trim().length() > 0) {
+                                            reference = sysValue.trim();
+                                        } else {
+                                            sysProperty = element.getPrefix() + "." + element.getLocalName() + "." + property;
+                                            sysValue = System.getProperty(sysProperty);
+                                            if (sysValue != null && sysValue.trim().length() > 0) {
+                                                reference = sysValue.trim();
+                                            }
+                                        }
+                                    }
                                 } else if ("protocol".equals(property) 
                                         && ExtensionLoader.getExtensionLoader(Protocol.class).hasExtension(value)
                                         && (! parserContext.getRegistry().containsBeanDefinition(value)
@@ -201,11 +183,6 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                                     ProtocolConfig protocol = new ProtocolConfig();
                                     protocol.setName(value);
                                     reference = protocol;
-                                } else if ("monitor".equals(property) 
-                                        && (! parserContext.getRegistry().containsBeanDefinition(value)
-                                                || ! MonitorConfig.class.getName().equals(parserContext.getRegistry().getBeanDefinition(value).getBeanClassName()))) {
-                                    // 兼容旧版本配置
-                                    reference = convertMonitor(value);
                                 } else if ("onreturn".equals(property)) {
                                     int index = value.lastIndexOf(".");
                                     String returnRef = value.substring(0, index);
@@ -234,48 +211,7 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                 }
             }
         }
-        NamedNodeMap attributes = element.getAttributes();
-        int len = attributes.getLength();
-        for (int i = 0; i < len; i++) {
-            Node node = attributes.item(i);
-            String name = node.getLocalName();
-            if (! props.contains(name)) {
-                if (parameters == null) {
-                    parameters = new ManagedMap();
-                }
-                String value = node.getNodeValue();
-                parameters.put(name, new TypedStringValue(value, String.class));
-            }
-        }
-        if (parameters != null) {
-            beanDefinition.getPropertyValues().addPropertyValue("parameters", parameters);
-        }
         return beanDefinition;
-    }
-
-    private static final Pattern GROUP_AND_VERION = Pattern.compile("^[\\-.0-9_a-zA-Z]+(\\:[\\-.0-9_a-zA-Z]+)?$");
-    
-    protected static MonitorConfig convertMonitor(String monitor) {
-        if (monitor == null || monitor.length() == 0) {
-            return null;
-        }
-        if (GROUP_AND_VERION.matcher(monitor).matches()) {
-            String group;
-            String version;
-            int i = monitor.indexOf(':');
-            if (i > 0) {
-                group = monitor.substring(0, i);
-                version = monitor.substring(i + 1);
-            } else {
-                group = monitor;
-                version = null;
-            }
-            MonitorConfig monitorConfig = new MonitorConfig();
-            monitorConfig.setGroup(group);
-            monitorConfig.setVersion(version);
-            return monitorConfig;
-        }
-        return null;
     }
  
     private static boolean isPrimitive(Class<?> cls) {
@@ -301,60 +237,9 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
         }
         beanDefinition.getPropertyValues().addPropertyValue(property, list);
     }
-    
-    private static void parseNested(Element element, ParserContext parserContext, Class<?> beanClass, boolean required, String tag, String property, String ref, BeanDefinition beanDefinition) {
-        NodeList nodeList = element.getChildNodes();
-        if (nodeList != null && nodeList.getLength() > 0) {
-            boolean first = true;
-            for (int i = 0; i < nodeList.getLength(); i++) {
-                Node node = nodeList.item(i);
-                if (node instanceof Element) {
-                    if (tag.equals(node.getNodeName())
-                            || tag.equals(node.getLocalName())) {
-                        if (first) {
-                            first = false;
-                            String isDefault = element.getAttribute("default");
-                            if (isDefault == null || isDefault.length() == 0) {
-                                beanDefinition.getPropertyValues().addPropertyValue("default", "false");
-                            }
-                        }
-                        BeanDefinition subDefinition = parse((Element) node, parserContext, beanClass, required);
-                        if (subDefinition != null && ref != null && ref.length() > 0) {
-                            subDefinition.getPropertyValues().addPropertyValue(property, new RuntimeBeanReference(ref));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private static void parseProperties(NodeList nodeList, RootBeanDefinition beanDefinition) {
-        if (nodeList != null && nodeList.getLength() > 0) {
-            for (int i = 0; i < nodeList.getLength(); i++) {
-                Node node = nodeList.item(i);
-                if (node instanceof Element) {
-                    if ("property".equals(node.getNodeName())
-                            || "property".equals(node.getLocalName())) {
-                        String name = ((Element) node).getAttribute("name");
-                        if (name != null && name.length() > 0) {
-                            String value = ((Element) node).getAttribute("value");
-                            String ref = ((Element) node).getAttribute("ref");
-                            if (value != null && value.length() > 0) {
-                                beanDefinition.getPropertyValues().addPropertyValue(name, value);
-                            } else if (ref != null && ref.length() > 0) {
-                                beanDefinition.getPropertyValues().addPropertyValue(name, new RuntimeBeanReference(ref));
-                            } else {
-                                throw new UnsupportedOperationException("Unsupported <property name=\"" + name + "\"> sub tag, Only supported <property name=\"" + name + "\" ref=\"...\" /> or <property name=\"" + name + "\" value=\"...\" />");
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     @SuppressWarnings("unchecked")
-    private static ManagedMap parseParameters(NodeList nodeList, RootBeanDefinition beanDefinition) {
+    private static void parseParameters(NodeList nodeList, RootBeanDefinition beanDefinition) {
         if (nodeList != null && nodeList.getLength() > 0) {
             ManagedMap parameters = null;
             for (int i = 0; i < nodeList.getLength(); i++) {
@@ -375,9 +260,10 @@ public class DubboBeanDefinitionParser implements BeanDefinitionParser {
                     }
                 }
             }
-            return parameters;
+            if (parameters != null) {
+                beanDefinition.getPropertyValues().addPropertyValue("parameters", parameters);
+            }
         }
-        return null;
     }
 
     @SuppressWarnings("unchecked")

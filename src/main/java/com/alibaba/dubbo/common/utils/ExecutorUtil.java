@@ -64,7 +64,7 @@ public class ExecutorUtil {
             Thread.currentThread().interrupt();
         }
         if (!isShutdown(es)){
-            newThreadToCloseExecutor(es);
+            newThreadToCloseExecutor(es ,timeout);
         }
     }
     public static void shutdownNow(Executor executor, final int timeout) {
@@ -85,26 +85,24 @@ public class ExecutorUtil {
             Thread.currentThread().interrupt();
         }
         if (!isShutdown(es)){
-            newThreadToCloseExecutor(es);
+            newThreadToCloseExecutor(es ,timeout);
         }
     }
 
-    private static void newThreadToCloseExecutor(final ExecutorService es) {
+    private static void newThreadToCloseExecutor(final ExecutorService es, final int timeout) {
         if (!isShutdown(es)) {
             shutdownExecutor.execute(new Runnable() {
                 public void run() {
                     try {
-                        for (int i=0;i<1000;i++){
-                            es.shutdownNow();
-                            if (es.awaitTermination(10, TimeUnit.MILLISECONDS)){
-                                break;
-                            }
-                        }
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
+                        es.shutdownNow();
                     } catch (Throwable e) {
                         logger.warn(e.getMessage(), e);
-                    } 
+                    }
+                    try {
+                        es.awaitTermination(timeout, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             });
         }

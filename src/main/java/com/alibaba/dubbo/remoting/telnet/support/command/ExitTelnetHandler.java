@@ -15,7 +15,7 @@
  */
 package com.alibaba.dubbo.remoting.telnet.support.command;
 
-import com.alibaba.dubbo.common.extension.Activate;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.remoting.Channel;
 import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
 import com.alibaba.dubbo.remoting.telnet.support.Help;
@@ -25,8 +25,8 @@ import com.alibaba.dubbo.remoting.telnet.support.Help;
  * 
  * @author william.liangf
  */
-@Activate
 @Help(parameter = "", summary = "Exit the telnet.", detail = "Exit the telnet.")
+@Extension("exit")
 public class ExitTelnetHandler implements TelnetHandler {
 
     public String telnet(Channel channel, String message) {

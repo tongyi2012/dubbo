@@ -22,34 +22,20 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 替换：
- * 请使用KV格式的配置文件：META-INF/dubbo/com.xxx.Protocol，文件内容：xxx=com.xxx.XxxProtocol
+ * 扩展点实现的元信息。
  * 
- * 原因：
- * 当扩展点的static字段或方法签名上引用了三方库，
- * 如果三方库不存在，会导致类初始化失败，
- * Extension标识Dubbo就拿不到了，异常信息就和配置对应不起来。
- * 
- * 比如:
- * Extension("mina")加载失败，
- * 当用户配置使用mina时，就会报找不到扩展点，
- * 而不是报加载扩展点失败，以及失败原因。
- * 
- * @deprecated
  * @author william.liangf
  * @author ding.lid
- * @export
  */
-@Deprecated
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
 public @interface Extension {
 
     /**
-     * @deprecated
+     * 扩展点名称。<br>
+     * 
+     * 如果注解在扩展的接口上，则缺省的扩展点。<p>
      */
-    @Deprecated
 	String value() default "";
-
 }

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.serialize.ObjectInput;
 import com.alibaba.dubbo.common.serialize.ObjectOutput;
@@ -29,6 +30,7 @@ import com.alibaba.dubbo.common.serialize.Serialization;
  * 
  * @author william.liangf
  */
+@Extension("json")
 public class JsonSerialization implements Serialization {
 
     public byte getContentTypeId() {
@@ -40,7 +42,7 @@ public class JsonSerialization implements Serialization {
     }
     
     public ObjectOutput serialize(URL url, OutputStream output) throws IOException {
-        return new JsonObjectOutput(output, url.getParameter("with.class", true));
+        return new JsonObjectOutput(output, url.getBooleanParameter("with.class", true));
     }
 
     public ObjectInput deserialize(URL url, InputStream input) throws IOException {

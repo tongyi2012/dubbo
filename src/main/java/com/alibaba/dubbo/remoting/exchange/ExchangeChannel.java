@@ -29,7 +29,7 @@ public interface ExchangeChannel extends Channel {
      * send request.
      * 
      * @param request
-     * @return response future
+     * @return
      * @throws RemotingException
      */
     ResponseFuture request(Object request) throws RemotingException;
@@ -39,7 +39,7 @@ public interface ExchangeChannel extends Channel {
      * 
      * @param request
      * @param timeout
-     * @return response future
+     * @return
      * @throws RemotingException
      */
     ResponseFuture request(Object request, int timeout) throws RemotingException;

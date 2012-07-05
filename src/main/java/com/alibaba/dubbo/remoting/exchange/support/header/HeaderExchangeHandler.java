@@ -15,13 +15,8 @@
  */
 package com.alibaba.dubbo.remoting.exchange.support.header;
 
-import java.net.InetSocketAddress;
-
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
-import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.remoting.Channel;
 import com.alibaba.dubbo.remoting.ChannelHandler;
@@ -32,15 +27,13 @@ import com.alibaba.dubbo.remoting.exchange.ExchangeHandler;
 import com.alibaba.dubbo.remoting.exchange.Request;
 import com.alibaba.dubbo.remoting.exchange.Response;
 import com.alibaba.dubbo.remoting.exchange.support.DefaultFuture;
-import com.alibaba.dubbo.remoting.transport.ChannelHandlerDelegate;
 
 /**
  * ExchangeReceiver
  * 
  * @author william.liangf
- * @author chao.liuc
  */
-public class HeaderExchangeHandler implements ChannelHandlerDelegate {
+public class HeaderExchangeHandler implements ChannelHandler {
 
     protected static final Logger logger              = LoggerFactory.getLogger(HeaderExchangeHandler.class);
 
@@ -57,14 +50,13 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         this.handler = handler;
     }
 
-    void handlerEvent(Channel channel, Request req) throws RemotingException {
-        if (req.getData() != null && req.getData().equals(Request.READONLY_EVENT)) {
-            channel.setAttribute(Constants.CHANNEL_ATTRIBUTE_READONLY_KEY, Boolean.TRUE);
-        }
-    }
-
     Response handleRequest(ExchangeChannel channel, Request req) throws RemotingException {
         Response res = new Response(req.getId(), req.getVersion());
+        if (req.isHeartbeat()) {
+            res.setHeartbeat(true);
+            return res;
+        }
+
         if (req.isBroken()) {
             Object data = req.getData();
 
@@ -77,16 +69,22 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
 
             return res;
         }
+
         // find handler by message class.
         Object msg = req.getData();
-        try {
-            // handle data.
-            Object result = handler.reply(channel, msg);
-            res.setStatus(Response.OK);
-            res.setResult(result);
-        } catch (Throwable e) {
-            res.setStatus(Response.SERVICE_ERROR);
-            res.setErrorMessage(StringUtils.toString(e));
+        if (handler == null) {// no handler.
+            res.setStatus(Response.SERVICE_NOT_FOUND);
+            res.setErrorMessage("InvokeHandler not found, Unsupported protocol object: " + msg);
+        } else {
+            try {
+                // handle data.
+                Object result = handler.reply(channel, msg);
+                res.setStatus(Response.OK);
+                res.setResult(result);
+            } catch (Throwable e) {
+                res.setStatus(Response.SERVICE_ERROR);
+                res.setErrorMessage(StringUtils.toString(e));
+            }
         }
         return res;
     }
@@ -148,14 +146,6 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
-    private static boolean isClientSide(Channel channel) {
-        InetSocketAddress address = channel.getRemoteAddress();
-        URL url = channel.getUrl();
-        return url.getPort() == address.getPort() && 
-                    NetUtils.filterLocalHost(url.getIp())
-                    .equals(NetUtils.filterLocalHost(address.getAddress().getHostAddress()));
-    }
-
     public void received(Channel channel, Object message) throws RemotingException {
         channel.setAttribute(KEY_READ_TIMESTAMP, System.currentTimeMillis());
         ExchangeChannel exchangeChannel = HeaderExchangeChannel.getOrAddChannel(channel);
@@ -163,27 +153,21 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
             if (message instanceof Request) {
                 // handle request.
                 Request request = (Request) message;
-                if (request.isEvent()) {
-                    handlerEvent(channel, request);
-                } else {
-                    if (request.isTwoWay()) {
-                        Response response = handleRequest(exchangeChannel, request);
-                        channel.send(response);
-                    } else {
-                        handler.received(exchangeChannel, request.getData());
+                if (request.isTwoWay()) {
+                    Response response = handleRequest(exchangeChannel, request);
+                    if (response == null) {
+                        throw new RemotingException(channel, "Response is null.");
                     }
+                    channel.send(response);
+                } else {
+                    handler.received(exchangeChannel, request.getData());
                 }
             } else if (message instanceof Response) {
                 handleResponse(channel, (Response) message);
             } else if (message instanceof String) {
-                if (isClientSide(channel)) {
-                    Exception e = new Exception("Dubbo client can not supported string message: " + message + " in channel: " + channel + ", url: " + channel.getUrl());
-                    logger.error(e.getMessage(), e);
-                } else {
-                    String echo = handler.telnet(channel, (String) message);
-                    if (echo != null && echo.length() > 0) {
-                        channel.send(echo);
-                    }
+                String echo = handler.telnet(channel, (String) message);
+                if (echo != null && echo.length() > 0) {
+                    channel.send(echo);
                 }
             } else {
                 handler.received(exchangeChannel, message);
@@ -216,11 +200,4 @@ public class HeaderExchangeHandler implements ChannelHandlerDelegate {
         }
     }
 
-    public ChannelHandler getHandler() {
-        if (handler instanceof ChannelHandlerDelegate) {
-            return ((ChannelHandlerDelegate) handler).getHandler();
-        } else {
-            return handler;
-        }
-    }
 }

@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.serialize.ObjectInput;
 import com.alibaba.dubbo.common.serialize.ObjectOutput;
@@ -27,6 +28,7 @@ import com.alibaba.dubbo.common.serialize.Serialization;
 /**
  * @author ding.lid
  */
+@Extension("dubbo")
 public class DubboSerialization implements Serialization {
 
     public byte getContentTypeId() {

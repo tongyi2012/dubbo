@@ -15,12 +15,15 @@
  */
 package com.alibaba.dubbo.remoting.telnet.support;
 
+import java.util.List;
+
 import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
+import com.alibaba.dubbo.common.ExtensionLoader;
+import com.alibaba.dubbo.common.utils.ConfigUtils;
 import com.alibaba.dubbo.remoting.Channel;
 import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.telnet.TelnetHandler;
-import com.alibaba.dubbo.remoting.transport.ChannelHandlerAdapter;
+import com.alibaba.dubbo.remoting.transport.support.ChannelHandlerAdapter;
 
 /**
  * TelnetHandlerDispather
@@ -28,49 +31,48 @@ import com.alibaba.dubbo.remoting.transport.ChannelHandlerAdapter;
  * @author william.liangf
  */
 public class TelnetHandlerAdapter extends ChannelHandlerAdapter implements TelnetHandler {
-
-    private final ExtensionLoader<TelnetHandler> extensionLoader = ExtensionLoader.getExtensionLoader(TelnetHandler.class);
-
+    
     public String telnet(Channel channel, String message) throws RemotingException {
-        String prompt = channel.getUrl().getParameterAndDecoded(Constants.PROMPT_KEY, Constants.DEFAULT_PROMPT);
-        boolean noprompt = message.contains("--no-prompt");
-        message = message.replace("--no-prompt", "");
+        String telnet = channel.getUrl().getParameter("telnet");
+        String prompt = channel.getUrl().getParameter("prompt");
+        List<String> commands = ConfigUtils.mergeValues(TelnetHandler.class, telnet, Constants.DEFAULT_TELNET_COMMANDS);
         StringBuilder buf = new StringBuilder();
-        message = message.trim();
-        String command;
-        if (message.length() > 0) {
-            int i = message.indexOf(' ');
-            if (i > 0) {
-                command = message.substring(0, i).trim();
-                message = message.substring(i + 1).trim();
+        if (commands != null && commands.size() > 0) {
+            message = message.trim();
+            String command;
+            if (message.length() > 0) {
+                int i = message.indexOf(' ');
+                if (i > 0) {
+                    command = message.substring(0, i).trim();
+                    message = message.substring(i + 1).trim();
+                } else {
+                    command = message;
+                    message = "";
+                }
             } else {
-                command = message;
-                message = "";
+                command = "";
             }
-        } else {
-            command = "";
-        }
-        if (command.length() > 0) {
-            if (extensionLoader.hasExtension(command)) {
+            if (commands.contains(command)) {
+                TelnetHandler handler = ExtensionLoader.getExtensionLoader(TelnetHandler.class).getExtension(command);
                 try {
-                    String result = extensionLoader.getExtension(command).telnet(channel, message);
-                    if (result == null) {
-                        return null;
+                    String result = handler.telnet(channel, message);
+                    if (result != null) {
+                        buf.append(result);
                     }
-                    buf.append(result);
                 } catch (Throwable t) {
                     buf.append(t.getMessage());
                 }
-            } else {
+            } else if (command.length() > 0) {
                 buf.append("Unsupported command: ");
                 buf.append(command);
             }
+            if (buf.length() > 0) {
+                buf.append("\r\n");
+            }
         }
-        if (buf.length() > 0) {
-            buf.append("\r\n");
-        }
-        if (prompt != null && prompt.length() > 0 && ! noprompt) {
+        if (prompt != null && prompt.length() > 0) {
             buf.append(prompt);
+            buf.append(">");
         }
         return buf.toString();
     }

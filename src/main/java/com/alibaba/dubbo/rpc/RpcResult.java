@@ -18,7 +18,7 @@ package com.alibaba.dubbo.rpc;
 import java.io.Serializable;
 
 /**
- * RPC Result.
+ * Generic rpc invoke result.
  * 
  * @serial Don't change the class name and properties.
  * @author qianlei
@@ -49,30 +49,12 @@ public class RpcResult implements Result, Serializable {
         return result;
     }
 
-    /**
-     * @deprecated Replace to getValue()
-     * @see com.alibaba.dubbo.rpc.RpcResult#getValue()
-     */
-    @Deprecated
     public Object getResult() {
-        return getValue();
-    }
-
-    /**
-     * @deprecated Replace to setValue()
-     * @see com.alibaba.dubbo.rpc.RpcResult#setValue()
-     */
-    @Deprecated
-    public void setResult(Object result) {
-        setValue(result);
-    }
-
-    public Object getValue() {
         return result;
     }
 
-    public void setValue(Object value) {
-        this.result = value;
+    public void setResult(Object result) {
+        this.result = result;
     }
 
     public Throwable getException() {
@@ -87,8 +69,4 @@ public class RpcResult implements Result, Serializable {
         return exception != null;
     }
 
-    @Override
-    public String toString() {
-        return "RpcResult [result=" + result + ", exception=" + exception + "]";
-    }
 }

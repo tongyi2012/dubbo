@@ -18,14 +18,14 @@ package com.alibaba.dubbo.rpc.filter;
 import java.lang.reflect.Method;
 
 import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.extension.Activate;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.utils.PojoUtils;
 import com.alibaba.dubbo.common.utils.ReflectUtils;
 import com.alibaba.dubbo.rpc.Filter;
-import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
-import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcException;
+import com.alibaba.dubbo.rpc.Invocation;
+import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcInvocation;
 import com.alibaba.dubbo.rpc.RpcResult;
 import com.alibaba.dubbo.rpc.service.GenericException;
@@ -35,14 +35,14 @@ import com.alibaba.dubbo.rpc.service.GenericException;
  * 
  * @author william.liangf
  */
-@Activate(group = Constants.PROVIDER, order = -20000)
+@Extension("generic")
 public class GenericFilter implements Filter {
     
     public Result invoke(Invoker<?> invoker, Invocation inv) throws RpcException {
         if (inv.getMethodName().equals(Constants.$INVOKE) 
                 && inv.getArguments() != null
                 && inv.getArguments().length == 3
-                && ! invoker.getUrl().getParameter(Constants.GENERIC_KEY, false)) {
+                && ! invoker.getUrl().getBooleanParameter(Constants.GENERIC_KEY)) {
             String name = ((String) inv.getArguments()[0]).trim();
             String[] types = (String[]) inv.getArguments()[1];
             Object[] args = (Object[]) inv.getArguments()[2];
@@ -52,13 +52,12 @@ public class GenericFilter implements Filter {
                 if (args == null) {
                     args = new Object[params.length];
                 }
-                args = PojoUtils.realize(args, params, method.getGenericParameterTypes());
-                Result result = invoker.invoke(new RpcInvocation(method, args, inv.getAttachments()));
-                if (result.hasException()
-                        && ! (result.getException() instanceof GenericException)) {
+                args = PojoUtils.realize(args, params);
+                Result result = invoker.invoke(new RpcInvocation(method, args));
+                if (result.hasException()) {
                     return new RpcResult(new GenericException(result.getException()));
                 }
-                return new RpcResult(PojoUtils.generalize(result.getValue()));
+                return new RpcResult(PojoUtils.generalize(result.getResult()));
             } catch (NoSuchMethodException e) {
                 throw new RpcException(e.getMessage(), e);
             } catch (ClassNotFoundException e) {

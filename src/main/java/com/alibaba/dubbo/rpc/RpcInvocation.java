@@ -21,11 +21,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.URL;
-
 /**
- * RPC Invocation.
+ * Rpc invocation.
  * 
  * @serial Don't change the class name and properties.
  * @author qian.lei
@@ -34,84 +31,36 @@ public class RpcInvocation implements Invocation, Serializable {
 
     private static final long serialVersionUID = -4355285085441097045L;
 
-    private String               methodName;
+    private String              methodName;
 
-    private Class<?>[]           parameterTypes;
+    private Class<?>[]          parameterTypes;
 
-    private Object[]             arguments;
+    private Object[]            arguments;
 
-    private Map<String, String>  attachments;
-
-    private transient Invoker<?> invoker;
+    private Map<String, String> attachments;
 
     public RpcInvocation() {
     }
 
-    public RpcInvocation(Invocation invocation, Invoker<?> invoker) {
-        this(invocation.getMethodName(), invocation.getParameterTypes(), 
-                invocation.getArguments(), new HashMap<String, String>(invocation.getAttachments()),
-                invocation.getInvoker());
-        if (invoker != null) {
-            URL url = invoker.getUrl();
-            setAttachment(Constants.PATH_KEY, url.getPath());
-            if (url.hasParameter(Constants.INTERFACE_KEY)) {
-                setAttachment(Constants.INTERFACE_KEY, url.getParameter(Constants.INTERFACE_KEY));
-            }
-            if (url.hasParameter(Constants.GROUP_KEY)) {
-                setAttachment(Constants.GROUP_KEY, url.getParameter(Constants.GROUP_KEY));
-            }
-            if (url.hasParameter(Constants.VERSION_KEY)) {
-                setAttachment(Constants.VERSION_KEY, url.getParameter(Constants.VERSION_KEY, "0.0.0"));
-            }
-            if (url.hasParameter(Constants.TIMEOUT_KEY)) {
-                setAttachment(Constants.TIMEOUT_KEY, url.getParameter(Constants.TIMEOUT_KEY));
-            }
-            if (url.hasParameter(Constants.TOKEN_KEY)) {
-                setAttachment(Constants.TOKEN_KEY, url.getParameter(Constants.TOKEN_KEY));
-            }
-            if (url.hasParameter(Constants.APPLICATION_KEY)) {
-                setAttachment(Constants.APPLICATION_KEY, url.getParameter(Constants.APPLICATION_KEY));
-            }
-        }
-    }
-
-    public RpcInvocation(Invocation invocation) {
-        this(invocation.getMethodName(), invocation.getParameterTypes(), 
-                invocation.getArguments(), invocation.getAttachments(), invocation.getInvoker());
-    }
-
     public RpcInvocation(Method method, Object[] arguments) {
-        this(method.getName(), method.getParameterTypes(), arguments, null, null);
+        this(method.getName(), method.getParameterTypes(), arguments, null);
     }
 
     public RpcInvocation(Method method, Object[] arguments, Map<String, String> attachment) {
-        this(method.getName(), method.getParameterTypes(), arguments, attachment, null);
+        this(method.getName(), method.getParameterTypes(), arguments, attachment);
     }
 
     public RpcInvocation(String methodName, Class<?>[] parameterTypes, Object[] arguments) {
-        this(methodName, parameterTypes, arguments, null, null);
+        this(methodName, parameterTypes, arguments, null);
     }
 
     public RpcInvocation(String methodName, Class<?>[] parameterTypes, Object[] arguments, Map<String, String> attachments) {
-        this(methodName, parameterTypes, arguments, attachments, null);
-    }
-
-    public RpcInvocation(String methodName, Class<?>[] parameterTypes, Object[] arguments, Map<String, String> attachments, Invoker<?> invoker) {
         this.methodName = methodName;
         this.parameterTypes = parameterTypes == null ? new Class<?>[0] : parameterTypes;
         this.arguments = arguments == null ? new Object[0] : arguments;
         this.attachments = attachments == null ? new HashMap<String, String>() : attachments;
-        this.invoker = invoker;
-    }
-    
-    public Invoker<?> getInvoker() {
-        return invoker;
     }
 
-    public void setInvoker(Invoker<?> invoker) {
-        this.invoker = invoker;
-    }
-    
     public String getMethodName() {
         return methodName;
     }
@@ -175,5 +124,5 @@ public class RpcInvocation implements Invocation, Serializable {
                 + Arrays.toString(parameterTypes) + ", arguments=" + Arrays.toString(arguments)
                 + ", attachments=" + attachments + "]";
     }
-
+    
 }

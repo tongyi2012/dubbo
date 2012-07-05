@@ -15,23 +15,23 @@
  */
 package com.alibaba.dubbo.monitor;
 
+import com.alibaba.dubbo.common.Adaptive;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
-import com.alibaba.dubbo.common.extension.Adaptive;
-import com.alibaba.dubbo.common.extension.SPI;
 
 /**
  * MonitorFactory. (SPI, Singleton, ThreadSafe)
  * 
  * @author william.liangf
  */
-@SPI("dubbo")
+@Extension("dubbo")
 public interface MonitorFactory {
     
     /**
      * Create monitor.
      * 
      * @param url
-     * @return monitor
+     * @return
      */
     @Adaptive("protocol")
     Monitor getMonitor(URL url);

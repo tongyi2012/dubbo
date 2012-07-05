@@ -15,7 +15,6 @@
  */
 package com.alibaba.dubbo.common.utils;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,9 +27,6 @@ import java.util.regex.Pattern;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.io.UnsafeStringWriter;
-import com.alibaba.dubbo.common.json.JSON;
-import com.alibaba.dubbo.common.logger.Logger;
-import com.alibaba.dubbo.common.logger.LoggerFactory;
 
 /**
  * StringUtils
@@ -38,10 +34,8 @@ import com.alibaba.dubbo.common.logger.LoggerFactory;
  * @author qian.lei
  */
 
-public final class StringUtils {
-
-    private static final Logger logger = LoggerFactory.getLogger(StringUtils.class);
-
+public final class StringUtils
+{
 	public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
 	private static final Pattern KVP_PATTERN = Pattern.compile("([_.a-zA-Z0-9][-_.a-zA-Z0-9]*)[=](.*)"); //key value pair pattern.
@@ -80,24 +74,10 @@ public final class StringUtils {
     }
     
     /**
-     * 
-     * @param s1
-     * @param s2
-     * @return equals
-     */
-    public static boolean isEquals(String s1, String s2) {
-        if (s1 == null && s2 == null)
-            return true;
-        if (s1 == null || s2 == null)
-            return false;
-        return s1.equals(s2);
-    }
-    
-    /**
      * is integer string.
      * 
      * @param str
-     * @return is integer
+     * @return
      */
     public static boolean isInteger(String str) {
     	if (str == null || str.length() == 0)
@@ -127,18 +107,11 @@ public final class StringUtils {
         return true;
     }
     
-    public static boolean isContains(String values, String value) {
-        if (values == null || values.length() == 0) {
-            return false;
-        }
-        return isContains(Constants.COMMA_SPLIT_PATTERN.split(values), value);
-    }
-    
     /**
      * 
      * @param values
      * @param value
-     * @return contains
+     * @return
      */
     public static boolean isContains(String[] values, String value) {
         if (value != null && value.length() > 0 && values != null && values.length > 0) {
@@ -150,31 +123,18 @@ public final class StringUtils {
         }
         return false;
     }
-    
-	public static boolean isNumeric(String str) {
-		if (str == null) {
-			return false;
-		}
-		int sz = str.length();
-		for (int i = 0; i < sz; i++) {
-			if (Character.isDigit(str.charAt(i)) == false) {
-				return false;
-			}
-		}
-		return true;
-	}
 
     /**
      * 
      * @param e
-     * @return string
+     * @return
      */
     public static String toString(Throwable e) {
     	UnsafeStringWriter w = new UnsafeStringWriter();
         PrintWriter p = new PrintWriter(w);
         p.print(e.getClass().getName());
         if (e.getMessage() != null) {
-            p.print(": " + e.getMessage());
+            p.print(e.getMessage());
         }
         p.println();
         try {
@@ -189,7 +149,7 @@ public final class StringUtils {
      * 
      * @param msg
      * @param e
-     * @return string
+     * @return
      */
     public static String toString(String msg, Throwable e) {
     	UnsafeStringWriter w = new UnsafeStringWriter();
@@ -405,51 +365,6 @@ public final class StringUtils {
 			}
 		}
 		return buf.toString();
-	}
-	
-	public static String camelToSplitName(String camelName, String split) {
-	    if (camelName == null || camelName.length() == 0) {
-	        return camelName;
-	    }
-	    StringBuilder buf = null;
-	    for (int i = 0; i < camelName.length(); i ++) {
-	        char ch = camelName.charAt(i);
-	        if (ch >= 'A' && ch <= 'Z') {
-	            if (buf == null) {
-	                buf = new StringBuilder();
-	                if (i > 0) {
-	                    buf.append(camelName.substring(0, i));
-	                }
-	            }
-	            if (i > 0) {
-	                buf.append(split);
-	            }
-	            buf.append(Character.toLowerCase(ch));
-	        } else if (buf != null) {
-	            buf.append(ch);
-	        }
-	    }
-	    return buf == null ? camelName : buf.toString();
-	}
-	
-	public static String toArgumentString(Object[] args) {
-	    StringBuilder buf = new StringBuilder();
-        for (Object arg : args) {
-            if (buf.length() > 0) {
-                buf.append(Constants.COMMA_SEPARATOR);
-            }
-            if (arg == null || ReflectUtils.isPrimitives(arg.getClass())) {
-                buf.append(arg);
-            } else {
-                try {
-                    buf.append(JSON.json(arg));
-                } catch (IOException e) {
-                    logger.warn(e.getMessage(), e);
-                    buf.append(arg);
-                }
-            }
-        }
-        return buf.toString();
 	}
 
 	private StringUtils(){}

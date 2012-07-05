@@ -34,10 +34,6 @@ public class DubboAppender extends ConsoleAppender {
     public static void doStop() {
         available = false;
     }
-    
-    public static void clear() {
-        logList.clear();
-    }
 
     public void append(LoggingEvent event) {
         super.append(event);
@@ -55,5 +51,4 @@ public class DubboAppender extends ConsoleAppender {
         log.setLogMessage(event.getMessage().toString());
         return log;
     }
-    
 }

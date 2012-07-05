@@ -64,7 +64,7 @@ public abstract class Proxy
 	 */
 	public static Proxy getProxy(Class<?>... ics)
 	{
-		return getProxy(ClassHelper.getCallerClassLoader(Proxy.class), ics);
+		return getProxy(ClassHelper.getClassLoader(ics[0]), ics);
 	}
 
 	/**
@@ -200,7 +200,6 @@ public abstract class Proxy
 			ccp.addField("public static java.lang.reflect.Method[] methods;");
 			ccp.addField("private " + InvocationHandler.class.getName() + " handler;");
 			ccp.addConstructor(Modifier.PUBLIC, new Class<?>[]{ InvocationHandler.class }, new Class<?>[0], "handler=$1;");
-            ccp.addDefaultConstructor();
 			Class<?> clazz = ccp.toClass();
 			clazz.getField("methods").set(null, methods.toArray(new Method[0]));
 

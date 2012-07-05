@@ -15,23 +15,21 @@
  */
 package com.alibaba.dubbo.rpc.filter;
 
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.common.extension.Activate;
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.utils.NetUtils;
 import com.alibaba.dubbo.rpc.Filter;
-import com.alibaba.dubbo.rpc.Invocation;
 import com.alibaba.dubbo.rpc.Invoker;
-import com.alibaba.dubbo.rpc.Result;
 import com.alibaba.dubbo.rpc.RpcContext;
 import com.alibaba.dubbo.rpc.RpcException;
-import com.alibaba.dubbo.rpc.RpcInvocation;
+import com.alibaba.dubbo.rpc.Invocation;
+import com.alibaba.dubbo.rpc.Result;
 
 /**
  * ConsumerContextInvokerFilter
  * 
  * @author william.liangf
  */
-@Activate(group = Constants.CONSUMER, order = -10000)
+@Extension("consumercontext")
 public class ConsumerContextFilter implements Filter {
 
     public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
@@ -41,14 +39,7 @@ public class ConsumerContextFilter implements Filter {
                 .setLocalAddress(NetUtils.getLocalHost(), 0)
                 .setRemoteAddress(invoker.getUrl().getHost(), 
                                   invoker.getUrl().getPort());
-        if (invocation instanceof RpcInvocation) {
-            ((RpcInvocation)invocation).setInvoker(invoker);
-        }
-        try {
-            return invoker.invoke(invocation);
-        } finally {
-            RpcContext.getContext().clearAttachments();
-        }
+        return invoker.invoke(invocation);
     }
 
 }

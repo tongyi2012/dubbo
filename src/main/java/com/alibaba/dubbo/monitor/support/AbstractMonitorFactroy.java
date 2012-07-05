@@ -21,11 +21,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.monitor.Monitor;
 import com.alibaba.dubbo.monitor.MonitorFactory;
-import com.alibaba.dubbo.monitor.MonitorService;
 
 /**
  * AbstractMonitorFactroy. (SPI, Singleton, ThreadSafe)
@@ -38,18 +36,16 @@ public abstract class AbstractMonitorFactroy implements MonitorFactory {
     private static final ReentrantLock LOCK = new ReentrantLock();
     
     // 注册中心集合 Map<RegistryAddress, Registry>
-    private static final Map<String, Monitor> MONITORS = new ConcurrentHashMap<String, Monitor>();
+    private static final Map<URL, Monitor> MONITORS = new ConcurrentHashMap<URL, Monitor>();
 
     public static Collection<Monitor> getMonitors() {
         return Collections.unmodifiableCollection(MONITORS.values());
     }
 
     public Monitor getMonitor(URL url) {
-    	url = url.setPath(MonitorService.class.getName()).addParameter(Constants.INTERFACE_KEY, MonitorService.class.getName());
-    	String key = url.toServiceString();
         LOCK.lock();
         try {
-            Monitor monitor = MONITORS.get(key);
+            Monitor monitor = MONITORS.get(url);
             if (monitor != null) {
                 return monitor;
             }
@@ -57,7 +53,7 @@ public abstract class AbstractMonitorFactroy implements MonitorFactory {
             if (monitor == null) {
                 throw new IllegalStateException("Can not create monitor " + url);
             }
-            MONITORS.put(key, monitor);
+            MONITORS.put(url, monitor);
             return monitor;
         } finally {
             // 释放锁

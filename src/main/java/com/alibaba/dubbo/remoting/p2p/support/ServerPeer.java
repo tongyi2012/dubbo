@@ -30,7 +30,7 @@ import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.Server;
 import com.alibaba.dubbo.remoting.p2p.Group;
 import com.alibaba.dubbo.remoting.p2p.Peer;
-import com.alibaba.dubbo.remoting.transport.ServerDelegate;
+import com.alibaba.dubbo.remoting.transport.support.ServerDelegate;
 
 /**
  * ServerPeer
@@ -82,7 +82,7 @@ public class ServerPeer extends ServerDelegate implements Peer {
         if (channel == null) {
             for (Map.Entry<URL, Client> entry : clients.entrySet()) {
                 URL url = entry.getKey();
-                if (url.getIp().equals(host) && url.getPort() == port) {
+                if (url.getHost().equals(host) && url.getPort() == port) {
                     return entry.getValue();
                 }
             }
@@ -92,7 +92,7 @@ public class ServerPeer extends ServerDelegate implements Peer {
 
     @Override
     public void send(Object message) throws RemotingException {
-        send(message, getUrl().getParameter(Constants.SENT_KEY, false));
+        send(message, getUrl().getBooleanParameter(Constants.SENT_KEY));
     }
 
     @Override

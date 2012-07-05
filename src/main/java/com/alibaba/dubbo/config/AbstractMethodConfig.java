@@ -17,15 +17,12 @@ package com.alibaba.dubbo.config;
 
 import java.util.Map;
 
-import com.alibaba.dubbo.common.Constants;
-import com.alibaba.dubbo.config.support.Parameter;
 import com.alibaba.dubbo.rpc.cluster.LoadBalance;
 
 /**
  * AbstractMethodConfig
  * 
  * @author william.liangf
- * @export
  */
 public abstract class AbstractMethodConfig extends AbstractConfig {
 
@@ -48,18 +45,6 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     
     // 异步发送是否等待发送成功
     protected Boolean             sent;
-
-    // 服务接口的失败mock实现类名
-    protected String              mock;
-
-    // 合并器
-    protected String              merger;
-    
-    // 服务接口的失败mock实现类名
-    protected String              cache;
-
-    // 服务接口的失败mock实现类名
-    protected String              validation;
 
     // 自定义参数
     protected Map<String, String> parameters;
@@ -97,6 +82,15 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
         this.async = async;
     }
 
+    public Map<String, String> getParameters() {
+        return parameters;
+    }
+
+    public void setParameters(Map<String, String> parameters) {
+        checkParameterName(parameters);
+        this.parameters = parameters;
+    }
+
     public Integer getActives() {
         return actives;
     }
@@ -112,60 +106,4 @@ public abstract class AbstractMethodConfig extends AbstractConfig {
     public void setSent(Boolean sent) {
         this.sent = sent;
     }
-
-    @Parameter(escaped = true)
-    public String getMock() {
-        return mock;
-    }
-
-    public void setMock(String mock) {
-        if (mock != null && mock.startsWith(Constants.RETURN_PREFIX)) {
-            checkLength("mock", mock);
-        } else {
-            checkName("mock", mock);
-        }
-        this.mock = mock;
-    }
-    
-    public void setMock(Boolean mock) {
-        if (mock == null) {
-            setMock((String) null);
-        } else {
-            setMock(String.valueOf(mock));
-        }
-    }
-
-    public String getMerger() {
-        return merger;
-    }
-
-    public void setMerger(String merger) {
-        this.merger = merger;
-    }
-
-    public String getCache() {
-        return cache;
-    }
-
-    public void setCache(String cache) {
-        this.cache = cache;
-    }
-
-    public String getValidation() {
-        return validation;
-    }
-
-    public void setValidation(String validation) {
-        this.validation = validation;
-    }
-
-    public Map<String, String> getParameters() {
-        return parameters;
-    }
-
-    public void setParameters(Map<String, String> parameters) {
-        checkParameterName(parameters);
-        this.parameters = parameters;
-    }
-
 }

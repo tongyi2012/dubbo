@@ -15,6 +15,7 @@
  */
 package com.alibaba.dubbo.remoting.exchange.support.header;
 
+import com.alibaba.dubbo.common.Extension;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.Transporters;
@@ -28,6 +29,7 @@ import com.alibaba.dubbo.remoting.exchange.Exchanger;
  * 
  * @author william.liangf
  */
+@Extension(HeaderExchanger.NAME)
 public class HeaderExchanger implements Exchanger {
     
     public static final String NAME = "header";
