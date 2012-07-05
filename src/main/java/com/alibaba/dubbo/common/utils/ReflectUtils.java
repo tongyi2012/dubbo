@@ -23,6 +23,8 @@ import java.security.CodeSource;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,9 +38,8 @@ import javassist.NotFoundException;
  * 
  * @author qian.lei
  */
-
-public final class ReflectUtils
-{
+public final class ReflectUtils {
+    
 	/**
 	 * void(V).
 	 */
@@ -107,6 +108,8 @@ public final class ReflectUtils
 	public static final Pattern SETTER_METHOD_DESC_PATTERN = Pattern.compile("set([A-Z][_a-zA-Z0-9]*)\\((" + DESC_REGEX + ")\\)V");
 
 	public static final Pattern IS_HAS_CAN_METHOD_DESC_PATTERN = Pattern.compile("(?:is|has|can)([A-Z][_a-zA-Z0-9]*)\\(\\)Z");
+	
+	private static final ConcurrentMap<String, Class<?>>  DESC_CLASS_CACHE = new ConcurrentHashMap<String, Class<?>>();
 
 	/**
 	 * is compatible.
@@ -563,7 +566,7 @@ public final class ReflectUtils
 	 * @param name name.
 	 * @return Class instance.
 	 */
-	public static Class<?> name2class(ClassLoader cl, String name) throws ClassNotFoundException
+	private static Class<?> name2class(ClassLoader cl, String name) throws ClassNotFoundException
 	{
 		int c = 0, index = name.indexOf('[');
 		if( index > 0 )
@@ -631,7 +634,7 @@ public final class ReflectUtils
 	 * @return Class instance.
 	 * @throws ClassNotFoundException 
 	 */
-	public static Class<?> desc2class(ClassLoader cl, String desc) throws ClassNotFoundException
+	private static Class<?> desc2class(ClassLoader cl, String desc) throws ClassNotFoundException
 	{
 		switch( desc.charAt(0) )
 		{
@@ -656,7 +659,11 @@ public final class ReflectUtils
 
 		if( cl == null )
 			cl = ClassHelper.getClassLoader();
-		return Class.forName(desc, true, cl);
+		Class<?> clazz = DESC_CLASS_CACHE.get(desc);
+		if(clazz==null){
+		    clazz = Class.forName(desc, true, cl);
+		}
+		return clazz;
 	}
 
 	/**
@@ -668,7 +675,8 @@ public final class ReflectUtils
 	 */
 	public static Class<?>[] desc2classArray(String desc) throws ClassNotFoundException
 	{
-		return desc2classArray(ClassHelper.getClassLoader(), desc);
+	    Class<?>[] ret = desc2classArray(ClassHelper.getClassLoader(), desc);
+		return ret;
 	}
 
 	/**
@@ -679,7 +687,7 @@ public final class ReflectUtils
 	 * @return Class[] class array.
 	 * @throws ClassNotFoundException 
 	 */
-	public static Class<?>[] desc2classArray(ClassLoader cl, String desc) throws ClassNotFoundException
+	private static Class<?>[] desc2classArray(ClassLoader cl, String desc) throws ClassNotFoundException
 	{
 		if( desc.length() == 0 )
 			return EMPTY_CLASS_ARRAY;
@@ -753,6 +761,29 @@ public final class ReflectUtils
 			}
 		}
 		return targetConstructor;
+    }
+
+    /**
+     * 检查对象是否是指定接口的实现。
+     * <p>
+     * 不会触发到指定接口的{@link Class}，所以如果ClassLoader中没有指定接口类时，也不会出错。
+     * 
+     * @param obj 要检查的对象
+     * @param interfaceClazzName 指定的接口名
+     * @return 返回{@code true}，如果对象实现了指定接口；否则返回{@code false}。
+     */
+    public static boolean isInstance(Object obj, String interfaceClazzName) {
+        for (Class<?> clazz = obj.getClass(); 
+                clazz != null && !clazz.equals(Object.class); 
+                clazz = clazz.getSuperclass()) {
+            Class<?>[] interfaces = clazz.getInterfaces();
+            for (Class<?> itf : interfaces) {
+                if (itf.getName().equals(interfaceClazzName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     
 	private ReflectUtils(){}

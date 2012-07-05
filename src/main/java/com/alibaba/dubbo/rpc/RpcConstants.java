@@ -27,10 +27,10 @@ import java.util.List;
 public final class RpcConstants {
 
     public static final List<String> DEFAULT_REFERENCE_FILTERS = Collections.unmodifiableList(Arrays.asList(new String[] {
-            "consumercontext", "compatible", "deprecated", "collect", "genericimpl", "activelimit", "monitor", "event" }));
+            "consumercontext", "compatible", "deprecated", "collect", "genericimpl", "activelimit", "monitor", "future" }));
 
     public static final List<String> DEFAULT_SERVICE_FILTERS    = Collections.unmodifiableList(Arrays.asList(new String[] {
-            "ready", "context", "token", "exception", "echo", "generic", "accesslog", "trace", "classloader", "executelimit", "monitor" ,"timeout"}));
+            "context", "token", "exception", "echo", "generic", "accesslog", "trace", "classloader", "executelimit", "monitor" ,"timeout"}));
 
     public static final List<String> DEFAULT_INVOKER_LISTENERS = Collections.unmodifiableList(Arrays.asList(new String[] {
             "deprecated" }));
@@ -74,17 +74,17 @@ public final class RpcConstants {
     /**
      * 注册中心是否同步存储文件，默认异步
      */
-    public static final String REGISTRY_FILESAVE_SYNC_KEY = "registry.syncsavefile";
+    public static final String REGISTRY_FILESAVE_SYNC_KEY = "save.file";
     
     /**
      *注册中心失败事件重试事件
      */
-    public static final String REGISTRY_RETRY_FAILED_PERIOD_KEY = "registry.retryfailedperiod";
+    public static final String REGISTRY_RETRY_PERIOD_KEY = "retry.period";
     
     /**
      *注册中心自动重连时间
      */
-    public static final String REGISTRY_RECONNECT_PERIOD_KEY = "registry.reconnectperiod";
+    public static final String REGISTRY_RECONNECT_PERIOD_KEY = "reconnect.period";
     
     /**
      * 注册中心导出URL参数的KEY

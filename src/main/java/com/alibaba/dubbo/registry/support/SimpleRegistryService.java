@@ -24,7 +24,9 @@ import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
 import com.alibaba.dubbo.common.utils.NetUtils;
+import com.alibaba.dubbo.common.utils.UrlUtils;
 import com.alibaba.dubbo.registry.NotifyListener;
+import com.alibaba.dubbo.registry.RegistryService;
 import com.alibaba.dubbo.rpc.RpcContext;
 
 /**
@@ -67,27 +69,27 @@ public class SimpleRegistryService extends AbstractRegistryService {
     }
 
     @Override
-    public void subscribe(String service, Map<String, String> parameters, NotifyListener listener) {
+    public void subscribe(String service, URL url, NotifyListener listener) {
         String client = RpcContext.getContext().getRemoteAddressString();
         if (logger.isInfoEnabled()){
             logger.info("[subscribe] service: "+service + ",client:"+ client);
         }
         List<URL> urls = getRegistered().get(service);
-        if ((com.alibaba.dubbo.registry.RegistryService.class.getName() + ":0.0.0").equals(service)
+        if ((RegistryService.class.getName() + ":0.0.0").equals(service)
                 && (urls == null || urls.size() == 0)) {
             register(service, new URL("dubbo", 
                     NetUtils.getLocalHost(), 
                     RpcContext.getContext().getLocalPort(), 
                     com.alibaba.dubbo.registry.RegistryService.class.getName(), 
-                    parameters));
+                    url.getParameters()));
             List<String> rs = registries;
             if (rs != null && rs.size() > 0) {
                 for (String registry : rs) {
-                    register(service, UrlUtils.parseURL(registry, parameters));
+                    register(service, UrlUtils.parseURL(registry, url.getParameters()));
                 }
             }
         }
-        super.subscribe(service, parameters, listener);
+        super.subscribe(service, url, listener);
         
         Map<String, NotifyListener> listeners = remoteListeners.get(client);
         if (listeners == null) {
@@ -104,8 +106,8 @@ public class SimpleRegistryService extends AbstractRegistryService {
     }
 
     @Override
-    public void unsubscribe(String service, Map<String, String> parameters, NotifyListener listener) {
-        super.unsubscribe(service, parameters, listener);
+    public void unsubscribe(String service, URL url, NotifyListener listener) {
+        super.unsubscribe(service, url, listener);
         String client = RpcContext.getContext().getRemoteAddressString();
         Map<String, NotifyListener> listeners = remoteListeners.get(client);
         if (listeners != null && listeners.size() > 0) {
@@ -132,7 +134,10 @@ public class SimpleRegistryService extends AbstractRegistryService {
         if (listeners != null && listeners.size() > 0) {
             for (Map.Entry<String, NotifyListener> entry : listeners.entrySet()) {
                 String service = entry.getKey();
-                super.unsubscribe(service, getSubscribed(service), entry.getValue());
+                super.unsubscribe(service, new URL("subscribe", 
+                        RpcContext.getContext().getRemoteHost(), 
+                        RpcContext.getContext().getRemotePort(), 
+                        com.alibaba.dubbo.registry.RegistryService.class.getName(), getSubscribed(service)), entry.getValue());
             }
         }
     }

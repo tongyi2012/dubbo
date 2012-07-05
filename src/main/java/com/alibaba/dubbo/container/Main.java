@@ -15,28 +15,51 @@
  */
 package com.alibaba.dubbo.container;
 
+import java.util.Arrays;
+
 import com.alibaba.dubbo.common.ExtensionLoader;
-import com.alibaba.dubbo.container.standalone.StandaloneContainer;
+import com.alibaba.dubbo.common.logger.Logger;
+import com.alibaba.dubbo.common.logger.LoggerFactory;
 
 /**
- * Main
+ * Main. (API, Static, ThreadSafe)
  * 
  * @author william.liangf
  */
 public class Main {
-    
+
+    private static final Logger logger    = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
-        final Container container = ExtensionLoader.getExtensionLoader(Container.class).getAdaptiveExtension();
+        final Container[] containers;
+        if(null == args || args.length == 0) {
+            containers = new Container[] {ExtensionLoader.getExtensionLoader(Container.class).getDefaultExtension()};
+            logger.info("Use default container type(" + ExtensionLoader.getExtensionLoader(Container.class).getDefaultExtensionName() + ") to run dubbo serivce.");
+        } else {
+            containers = new Container[args.length];
+            for (int i = 0; i < args.length; i ++) {
+                containers[i] = ExtensionLoader.getExtensionLoader(Container.class).getExtension(args[i]);
+            }
+            logger.info("Use container type(" + Arrays.toString(args) + ") to run dubbo serivce.");
+        }
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
-                container.stop();
+                for (Container container : containers) {
+                    try {
+                        container.stop();
+                    } catch (Throwable t) {
+                        logger.error(t.getMessage(), t);
+                    }
+                }
             }
         });
-        container.start();
-        synchronized (StandaloneContainer.class) {
+        for (Container container : containers) {
+            container.start();
+        }
+        synchronized (Main.class) {
             for (;;) {
                 try {
-                    StandaloneContainer.class.wait();
+                    Main.class.wait();
                 } catch (Throwable e) {
                 }
             }

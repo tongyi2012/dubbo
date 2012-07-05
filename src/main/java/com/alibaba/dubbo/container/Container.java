@@ -18,15 +18,21 @@ package com.alibaba.dubbo.container;
 import com.alibaba.dubbo.common.Extension;
 
 /**
- * TODO Comment of Container
+ * Container. (SPI, Singleton, ThreadSafe)
  * 
  * @author william.liangf
  */
-@Extension("standalone")
+@Extension("spring")
 public interface Container {
     
+    /**
+     * start.
+     */
     void start();
     
+    /**
+     * stop.
+     */
     void stop();
 
 }

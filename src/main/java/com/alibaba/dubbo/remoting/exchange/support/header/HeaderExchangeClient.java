@@ -100,6 +100,11 @@ public class HeaderExchangeClient implements ExchangeClient {
     public void reset(URL url) {
         client.reset(url);
     }
+    
+    @Deprecated
+    public void reset(com.alibaba.dubbo.common.Parameters parameters){
+        reset(getUrl().addParameters(parameters.getParameters()));
+    }
 
     public void reconnect() throws RemotingException {
         client.reconnect();

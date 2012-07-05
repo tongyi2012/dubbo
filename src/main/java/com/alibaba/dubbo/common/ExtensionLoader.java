@@ -46,7 +46,7 @@ import com.alibaba.dubbo.common.utils.Reference;
  * 
  * @see <a href="http://java.sun.com/j2se/1.5.0/docs/guide/jar/jar.html#Service%20Provider">JDK5.0的自动发现机制实现</a>
  * 
- * @author <a href="mailto:liangfei0201@gmail.com">liangfei</a>
+ * @author william.liangf
  * @author ding.lid
  * 
  * @see Extension
@@ -72,6 +72,7 @@ public class ExtensionLoader<T> {
     private volatile Class<?> cachedAdaptiveClass = null;
     
 	private final Reference<Object> cachedAdaptiveInstance = new Reference<Object>();
+	private volatile Throwable createAdaptiveInstanceError;
 	
     private Set<Class<?>> cachedWrapperClasses;
     
@@ -115,6 +116,17 @@ public class ExtensionLoader<T> {
 		}
 		return (T) instance;
 	}
+	
+	/**
+	 * 返回缺省的扩展，如果没有设置则返回<code>null</code>。 
+	 */
+	public T getDefaultExtension() {
+        getExtensionClasses();
+	    if(null == cachedDefaultName || cachedDefaultName.length() == 0) {
+	        return null;
+	    }
+	    return getExtension(cachedDefaultName);
+	}
 
 	public boolean hasExtension(String name) {
 	    if (name == null || name.length() == 0)
@@ -130,20 +142,47 @@ public class ExtensionLoader<T> {
         Map<String, Class<?>> clazzes = getExtensionClasses();
         return Collections.unmodifiableSet(new TreeSet<String>(clazzes.keySet()));
     }
+	
+	/**
+	 * 返回缺省的扩展点名，如果没有设置缺省则返回<code>null</code>。 
+	 */
+	public String getDefaultExtensionName() {
+	    getExtensionClasses();
+	    return cachedDefaultName;
+	}
+	
 
     @SuppressWarnings("unchecked")
     public T getAdaptiveExtension() {
         Object instance = cachedAdaptiveInstance.get();
         if (instance == null) {
-            synchronized (cachedAdaptiveInstance) {
-                instance = cachedAdaptiveInstance.get();
-                if (instance == null) {
-                    instance = createAdaptiveExtension();
-                    cachedAdaptiveInstance.set(instance);
+            if(createAdaptiveInstanceError == null) {
+                synchronized (cachedAdaptiveInstance) {
+                    instance = cachedAdaptiveInstance.get();
+                    if (instance == null) {
+                        try {
+                            instance = createAdaptiveExtension();
+                            cachedAdaptiveInstance.set(instance);
+                        } catch (Throwable t) {
+                            createAdaptiveInstanceError = t;
+                            rethrowAsRuntime(t, "fail to create adaptive instance: ");
+                        }
+                    }
                 }
             }
+            else {
+                rethrowAsRuntime(createAdaptiveInstanceError, "fail to create adaptive instance: ");
+            }
         }
+        
         return (T) instance;
+    }
+
+    private static void rethrowAsRuntime(Throwable t, String message) {
+        if(t instanceof RuntimeException)
+            throw (RuntimeException)t;
+        else
+            throw new IllegalStateException(message + t.toString(), t);
     }
 
     @SuppressWarnings("unchecked")
@@ -153,13 +192,11 @@ public class ExtensionLoader<T> {
             throw new IllegalStateException("No such extension " + type.getName() + " by name " + name);
         }
         try {
-            T instance = (T) clazz.newInstance();
-            injectExtension(instance);
+            T instance = injectExtension((T) clazz.newInstance());
             Set<Class<?>> wrapperClasses = cachedWrapperClasses;
             if (wrapperClasses != null && wrapperClasses.size() > 0) {
                 for (Class<?> wrapperClass : wrapperClasses) {
-                    instance = (T) wrapperClass.getConstructor(type).newInstance(instance);
-                    injectExtension(instance);
+                    instance = injectExtension((T) wrapperClass.getConstructor(type).newInstance(instance));
                 }
             }
             return instance;
@@ -169,7 +206,7 @@ public class ExtensionLoader<T> {
         }
     }
     
-    private void injectExtension(Object instance) {
+    private T injectExtension(T instance) {
         try {
             for (Method method : instance.getClass().getMethods()) {
                 if (method.getName().startsWith("set")
@@ -190,6 +227,7 @@ public class ExtensionLoader<T> {
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
+        return instance;
     }
     
 	private Class<?> getExtensionClass(String name) {
@@ -243,10 +281,12 @@ public class ExtensionLoader<T> {
                 while (urls.hasMoreElements()) {
                     java.net.URL url = urls.nextElement();
                     try {
-                        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), "utf-8"));
                         try {
                             String line = null;
                             while ((line = reader.readLine()) != null) {
+                                final int ci = line.indexOf('#');
+                                if (ci >= 0) line = line.substring(0, ci);
                                 line = line.trim();
                                 if (line.length() > 0) {
                                     try {
@@ -267,21 +307,21 @@ public class ExtensionLoader<T> {
                                         } else {
                                             try {
                                                 clazz.getConstructor(type);
-                                                Set<Class<?>> autoproxies = cachedWrapperClasses;
-                                                if (autoproxies == null) {
+                                                Set<Class<?>> wrappers = cachedWrapperClasses;
+                                                if (wrappers == null) {
                                                     cachedWrapperClasses = new ConcurrentHashSet<Class<?>>();
-                                                    autoproxies = cachedWrapperClasses;
+                                                    wrappers = cachedWrapperClasses;
                                                 }
-                                                autoproxies.add(clazz);
+                                                wrappers.add(clazz);
                                             } catch (NoSuchMethodException e) {
                                                 clazz.getConstructor();
                                                 Extension extension = clazz.getAnnotation(Extension.class);
                                                 if (extension == null) {
-                                                    throw new IllegalStateException("No such @Extension annotation in class " + type.getName());
+                                                    throw new IllegalStateException("No such @Extension annotation in class " + clazz.getName());
                                                 }
                                                 String name = extension.value();
                                                 if (name == null || name.length() == 0) {
-                                                    throw new IllegalStateException("Illegal @Extension annotation in class " + type.getName());
+                                                    throw new IllegalStateException("Illegal @Extension annotation in class " + clazz.getName());
                                                 }
                                                 String[] names = NAME_SEPARATOR.split(name);
                                                 for (String n : names) {
@@ -319,7 +359,7 @@ public class ExtensionLoader<T> {
     @SuppressWarnings("unchecked")
     private T createAdaptiveExtension() {
         try {
-            return (T) getAdaptiveExtensionClass().newInstance();
+            return injectExtension((T) getAdaptiveExtensionClass().newInstance());
         } catch (Exception e) {
             throw new IllegalStateException("Can not create adaptive extenstion " + type + ", cause: " + e.getMessage(), e);
         }
@@ -346,7 +386,7 @@ public class ExtensionLoader<T> {
         }
         // 完全没有Adaptive方法，则不需要生成Adaptive类
         if(! hasAdaptiveAnnotation)
-            throw new IllegalStateException("No such adaptive class for extension " + type.getName());
+            throw new IllegalStateException("No adaptive method on extension " + type.getName() + ", refuse to create the adaptive class!");
         
         ClassGenerator cg = ClassGenerator.newInstance(classLoader);
         cg.setClassName(type.getName() + "$Adpative");
@@ -501,6 +541,11 @@ public class ExtensionLoader<T> {
         }
         classLoader = ExtensionLoader.class.getClassLoader();
         return classLoader;
+    }
+    
+    @Override
+    public String toString() {
+        return this.getClass().getName() + "[" + type.getName() + "]";
     }
     
 }

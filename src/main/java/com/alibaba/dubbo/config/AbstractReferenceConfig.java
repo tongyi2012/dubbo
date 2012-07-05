@@ -21,16 +21,22 @@ import java.util.List;
 import java.util.Map;
 
 import com.alibaba.dubbo.common.Constants;
+import com.alibaba.dubbo.common.ExtensionLoader;
 import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.Version;
+import com.alibaba.dubbo.common.utils.ConfigUtils;
 import com.alibaba.dubbo.common.utils.NetUtils;
+import com.alibaba.dubbo.common.utils.StringUtils;
+import com.alibaba.dubbo.common.utils.UrlUtils;
+import com.alibaba.dubbo.monitor.MonitorFactory;
+import com.alibaba.dubbo.monitor.MonitorService;
+import com.alibaba.dubbo.registry.RegistryFactory;
 import com.alibaba.dubbo.registry.RegistryService;
-import com.alibaba.dubbo.registry.support.UrlUtils;
 import com.alibaba.dubbo.rpc.Filter;
 import com.alibaba.dubbo.rpc.InvokerListener;
+import com.alibaba.dubbo.rpc.ProxyFactory;
 import com.alibaba.dubbo.rpc.RpcConstants;
 import com.alibaba.dubbo.rpc.cluster.Cluster;
-import com.alibaba.dubbo.rpc.proxy.ProxyFactory;
 
 /**
  * AbstractDefaultConfig
@@ -51,7 +57,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
     protected String               mock;
 
     // 服务监控
-    protected String               monitor;
+    protected MonitorConfig        monitor;
     
     // 代理类型
     protected String               proxy;
@@ -140,7 +146,7 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
             }
         }
     }
-
+    
     protected List<URL> loadRegistries() {
         checkRegistry();
         List<URL> registryList = new ArrayList<URL>();
@@ -153,6 +159,13 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
                     Map<String, String> map = new HashMap<String, String>();
                     appendParameters(map, config);
                     map.put("path", RegistryService.class.getName());
+                    if (! map.containsKey("protocol")) {
+                        if (ExtensionLoader.getExtensionLoader(RegistryFactory.class).hasExtension("remote")) {
+                            map.put("protocol", "remote");
+                        } else {
+                            map.put("protocol", "dubbo");
+                        }
+                    }
                     List<URL> urls = UrlUtils.parseURLs(config.getAddress(), map);
                     for (URL url : urls) {
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
@@ -163,6 +176,28 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
             }
         }
         return registryList;
+    }
+    
+    protected URL loadMonitor(URL registryURL) {
+        if (monitor == null) {
+            return null;
+        }
+        Map<String, String> map = new HashMap<String, String>();
+        map.put(Constants.INTERFACE_KEY, MonitorService.class.getName());
+        appendParameters(map, monitor);
+        if (ConfigUtils.isNotEmpty(monitor.getAddress())) {
+            if (! map.containsKey(Constants.PROTOCOL_KEY)) {
+                if (ExtensionLoader.getExtensionLoader(MonitorFactory.class).hasExtension("logstat")) {
+                    map.put(Constants.PROTOCOL_KEY, "logstat");
+                } else {
+                    map.put(Constants.PROTOCOL_KEY, "dubbo");
+                }
+            }
+            return UrlUtils.parseURL(monitor.getAddress(), map);
+        } else if (ConfigUtils.isNotEmpty(monitor.getGroup()) && registryURL != null) {
+            return registryURL.setProtocol("dubbo").addParameter(Constants.PROTOCOL_KEY, "registry").addParameterAndEncoded(RpcConstants.REFER_KEY, StringUtils.toQueryString(map));
+        }
+        return null;
     }
 
     /**
@@ -300,12 +335,16 @@ public abstract class AbstractReferenceConfig extends AbstractMethodConfig {
         this.registries = (List<RegistryConfig>)registries;
     }
 
-    public String getMonitor() {
+    public MonitorConfig getMonitor() {
         return monitor;
     }
 
-    public void setMonitor(String monitor) {
+    public void setMonitor(MonitorConfig monitor) {
         this.monitor = monitor;
+    }
+
+    public void setMonitor(String monitor) {
+        this.monitor = new MonitorConfig(monitor);
     }
 
     public String getOwner() {

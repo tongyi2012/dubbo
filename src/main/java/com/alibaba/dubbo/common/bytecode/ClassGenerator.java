@@ -58,7 +58,7 @@ public final class ClassGenerator
 
 	public static ClassGenerator newInstance()
 	{
-		return new ClassGenerator(getClassPool(null));
+		return new ClassGenerator(getClassPool(Thread.currentThread().getContextClassLoader()));
 	}
 
 	public static ClassGenerator newInstance(ClassLoader loader)
@@ -71,7 +71,7 @@ public final class ClassGenerator
 		return ClassGenerator.DC.class.isAssignableFrom(cl);
 	}
 
-	private static ClassPool getClassPool(ClassLoader loader)
+	public static ClassPool getClassPool(ClassLoader loader)
 	{
 		if( loader == null )
 			return ClassPool.getDefault();

@@ -30,7 +30,7 @@ import com.alibaba.dubbo.remoting.RemotingException;
 import com.alibaba.dubbo.remoting.Server;
 import com.alibaba.dubbo.remoting.p2p.Group;
 import com.alibaba.dubbo.remoting.p2p.Peer;
-import com.alibaba.dubbo.remoting.transport.support.ServerDelegate;
+import com.alibaba.dubbo.remoting.transport.ServerDelegate;
 
 /**
  * ServerPeer
@@ -92,7 +92,7 @@ public class ServerPeer extends ServerDelegate implements Peer {
 
     @Override
     public void send(Object message) throws RemotingException {
-        send(message, getUrl().getBooleanParameter(Constants.SENT_KEY));
+        send(message, getUrl().getParameter(Constants.SENT_KEY, false));
     }
 
     @Override

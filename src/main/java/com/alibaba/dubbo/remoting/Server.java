@@ -18,6 +18,8 @@ package com.alibaba.dubbo.remoting;
 import java.net.InetSocketAddress;
 import java.util.Collection;
 
+import com.alibaba.dubbo.common.Resetable;
+
 /**
  * Remoting Server. (API/SPI, Prototype, ThreadSafe)
  * 
@@ -50,5 +52,8 @@ public interface Server extends Endpoint, Resetable {
      * @return channel
      */
     Channel getChannel(InetSocketAddress remoteAddress);
+
+    @Deprecated
+    void reset(com.alibaba.dubbo.common.Parameters parameters);
     
 }

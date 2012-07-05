@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2101 Alibaba Group.
+ * Copyright 1999-2011 Alibaba Group.
  *  
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package com.alibaba.dubbo.config;
 
 import java.io.InputStream;
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URLEncoder;
@@ -28,11 +27,8 @@ import java.util.regex.Pattern;
 
 import com.alibaba.dubbo.common.Constants;
 import com.alibaba.dubbo.common.ExtensionLoader;
-import com.alibaba.dubbo.common.URL;
 import com.alibaba.dubbo.common.logger.Logger;
 import com.alibaba.dubbo.common.logger.LoggerFactory;
-import com.alibaba.dubbo.monitor.MonitorService;
-import com.alibaba.dubbo.rpc.RpcConstants;
 
 /**
  * AbstractConfig
@@ -93,35 +89,6 @@ public abstract class AbstractConfig implements Serializable {
         return properties;
     }
     
-    private static final Pattern GROUP_AND_VERION = Pattern.compile("^[\\-.0-9_a-zA-Z]+(\\:[\\-.0-9_a-zA-Z]+)?$");
-    
-    protected static String convertMonitor(String monitor, URL registry) {
-        if (monitor == null || monitor.length() == 0) {
-            return null;
-        }
-        if (GROUP_AND_VERION.matcher(monitor).matches()) {
-            String group;
-            String version;
-            int i = monitor.indexOf(':');
-            if (i > 0) {
-                group = monitor.substring(0, i);
-                version = monitor.substring(i + 1);
-            } else {
-                group = monitor;
-                version = null;
-            }
-            monitor = registry.setProtocol("dubbo").addParameter(Constants.MONITOR_KEY, registry.getProtocol())
-                    .addParameterAndEncoded(RpcConstants.REFER_KEY, "group=" + group 
-                    + (version == null || version.length() == 0 ? "" : "&version=" + version) 
-                    + "&interface=" + MonitorService.class.getName()).toFullString();
-        }
-        try {
-            return URLEncoder.encode(monitor, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e.getMessage(), e);
-        }
-    }
-
     protected static void appendParameters(Map<String, String> parameters, Object config) {
         appendParameters(parameters, config, null);
     }
@@ -138,6 +105,20 @@ public abstract class AbstractConfig implements Serializable {
         appendMaps(parameters, config, prefix, true);
     }
     
+    private static boolean isPrimitive(Class<?> type) {
+        return type.isPrimitive() 
+                || type == String.class 
+                || type == Character.class
+                || type == Boolean.class
+                || type == Byte.class
+                || type == Short.class
+                || type == Integer.class 
+                || type == Long.class
+                || type == Float.class 
+                || type == Double.class
+                || type == Object.class;
+    }
+    
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private static void appendMaps(Map parameters, Object config, String prefix, boolean attribute) {
         if (config == null) {
@@ -151,16 +132,7 @@ public abstract class AbstractConfig implements Serializable {
                         && ! "getClass".equals(name)
                         && Modifier.isPublic(method.getModifiers()) 
                         && method.getParameterTypes().length == 0
-                        && (method.getReturnType() == String.class 
-                                || method.getReturnType() == Character.class
-                                || method.getReturnType() == Boolean.class
-                                || method.getReturnType() == Byte.class
-                                || method.getReturnType() == Short.class
-                                || method.getReturnType() == Integer.class 
-                                || method.getReturnType() == Long.class
-                                || method.getReturnType() == Float.class 
-                                || method.getReturnType() == Double.class
-                                || method.getReturnType() == Object.class)) {
+                        && isPrimitive(method.getReturnType())) {
                     Parameter parameter = method.getAnnotation(Parameter.class);
                     if (attribute){
                         if (parameter == null || !parameter.attribute())
@@ -303,6 +275,48 @@ public abstract class AbstractConfig implements Serializable {
                 ProtocolConfig.destroyAll();
             }
         }, "DubboShutdownHook"));
+    }
+    
+    @Override
+    public String toString() {
+        try {
+            String tag = getClass().getSimpleName();
+            if (tag.equals("Config")) {
+                tag = tag.substring(0, tag.length() - "Config".length());
+            }
+            tag = tag.toLowerCase();
+            StringBuilder buf = new StringBuilder();
+            buf.append("<dubbo:");
+            buf.append(tag);
+            Method[] methods = getClass().getMethods();
+            for (Method method : methods) {
+                try {
+                    String name = method.getName();
+                    if ((name.startsWith("get") || name.startsWith("is")) 
+                            && ! "getClass".equals(name)
+                            && Modifier.isPublic(method.getModifiers()) 
+                            && method.getParameterTypes().length == 0
+                            && isPrimitive(method.getReturnType())) {
+                        int i = name.startsWith("get") ? 3 : 2;
+                        String key = name.substring(i, i + 1).toLowerCase() + name.substring(i + 1);
+                        Object value = method.invoke(this, new Object[0]);
+                        if (value != null) {
+                            buf.append(" ");
+                            buf.append(key);
+                            buf.append("=\"");
+                            buf.append(value);
+                            buf.append("\"");
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn(e.getMessage(), e);
+                }
+            }
+            buf.append(" />");
+            return buf.toString();
+        } catch (Throwable t) { // 防御性容错
+            return super.toString();
+        }
     }
 
 }

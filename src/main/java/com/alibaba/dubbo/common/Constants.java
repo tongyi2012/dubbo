@@ -35,6 +35,8 @@ public class Constants {
 
     public static final String       SENT_KEY                       = "sent";
 
+    public static final boolean      DEFAULT_SENT                   = false;
+
     public static final String       REGISTRY_PROTOCOL              = "registry";
 
     public static final String       $INVOKE                        = "$invoke";
@@ -142,6 +144,8 @@ public class Constants {
 
     public static final String       MOCK_KEY                       = "mock";
 
+    public static final String       PROTOCOL_KEY                   = "protocol";
+
     public static final String       PROXY_KEY                      = "proxy";
 
     public static final String       WEIGHT_KEY                     = "weight";
@@ -225,6 +229,8 @@ public class Constants {
     
     public static final int          DEFAULT_RECONNECT_PERIOD       =  2000;
     
+    public static final String       SHUTDOWN_TIMEOUT_KEY           =  "shutdown.timeout";
+    
     public static final int          DEFAULT_SHUTDOWN_TIMEOUT       =  10000;
 
     public static final String       CHECK_KEY                      = "check";
@@ -253,6 +259,7 @@ public class Constants {
     
     public static final String       DEFAULT_CHANNEL_HANDLER        = "default";
     
+    public static final String       ANY_VALUE                      = "*";
 
     public static final String       COMMA_SEPARATOR                = ",";
 

@@ -15,6 +15,8 @@
  */
 package com.alibaba.dubbo.remoting;
 
+import com.alibaba.dubbo.common.Resetable;
+
 /**
  * Remoting Client. (API/SPI, Prototype, ThreadSafe)
  * 
@@ -30,5 +32,8 @@ public interface Client extends Endpoint, Channel, Resetable {
      * reconnect.
      */
     void reconnect() throws RemotingException;
-
+    
+    @Deprecated
+    void reset(com.alibaba.dubbo.common.Parameters parameters);
+    
 }

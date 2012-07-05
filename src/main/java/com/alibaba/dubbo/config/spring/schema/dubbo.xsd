@@ -44,6 +44,11 @@
 					<xsd:documentation><![CDATA[ The application environment, eg: dev/test/run ]]></xsd:documentation>
 				</xsd:annotation>
 			</xsd:attribute>
+			<xsd:attribute name="registry" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The application registry. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
 			<xsd:attribute name="monitor" type="xsd:string" use="optional">
 				<xsd:annotation>
 					<xsd:documentation><![CDATA[ The application monitor. ]]></xsd:documentation>
@@ -160,9 +165,34 @@
 			<xsd:documentation><![CDATA[ The logstat monitor config ]]></xsd:documentation> 
 		</xsd:annotation>
 		<xsd:complexType>
-			<xsd:attribute name="address" type="xsd:string" use="required">
+			<xsd:attribute name="address" type="xsd:string" use="optional">
 				<xsd:annotation>
 					<xsd:documentation><![CDATA[ The monitor address. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="protocol" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The monitor protocol. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="username" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The monitor username. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="password" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The monitor password. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="group" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The monitor group. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="version" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The monitor version. ]]></xsd:documentation>
 				</xsd:annotation>
 			</xsd:attribute>
 		</xsd:complexType>
@@ -222,7 +252,7 @@
 				<xsd:documentation><![CDATA[ The method does async. ]]></xsd:documentation>
 			</xsd:annotation>
 		</xsd:attribute>
-		<xsd:attribute name="sent" type="xsd:string" use="optional" default="true">
+		<xsd:attribute name="sent" type="xsd:string" use="optional">
 			<xsd:annotation>
 				<xsd:documentation><![CDATA[ The async method return await message sent ]]></xsd:documentation>
 			</xsd:annotation>
@@ -387,11 +417,6 @@
 						<xsd:documentation><![CDATA[ The service monitor. ]]></xsd:documentation>
 					</xsd:annotation>
 				</xsd:attribute>
-				<xsd:attribute name="lazy" type="xsd:string" use="optional">
-					<xsd:annotation>
-						<xsd:documentation><![CDATA[ lazy create connection. ]]></xsd:documentation>
-					</xsd:annotation>
-				</xsd:attribute>
 				<xsd:attribute name="callbacks" type="xsd:string" use="optional">
 					<xsd:annotation>
 						<xsd:documentation><![CDATA[ The callback instance limit peer connection.]]></xsd:documentation>
@@ -430,8 +455,18 @@
 					</xsd:annotation>
 				</xsd:attribute>
 				<xsd:attribute name="sticky" type="xsd:string" use="optional">
+						<xsd:annotation>
+							<xsd:documentation><![CDATA[ Enable/Disable cluster sticky policy.Default false ]]></xsd:documentation>
+						</xsd:annotation>
+					</xsd:attribute>
+				<xsd:attribute name="reconnect" type="xsd:string" use="optional">
 					<xsd:annotation>
-						<xsd:documentation><![CDATA[ conection  ]]></xsd:documentation>
+						<xsd:documentation><![CDATA[ remoting reconnect timer. false represent close reconnect. integer represent interval(ms) .default true(2000ms).]]></xsd:documentation>
+					</xsd:annotation>
+				</xsd:attribute>
+				<xsd:attribute name="lazy" type="xsd:string" use="optional">
+					<xsd:annotation>
+						<xsd:documentation><![CDATA[ lazy create connection. ]]></xsd:documentation>
 					</xsd:annotation>
 				</xsd:attribute>
 			</xsd:extension>
@@ -620,6 +655,11 @@
 			<xsd:attribute name="contextpath" type="xsd:string" use="optional">
 				<xsd:annotation>
 					<xsd:documentation><![CDATA[ The protocol context path. ]]></xsd:documentation>
+				</xsd:annotation>
+			</xsd:attribute>
+			<xsd:attribute name="register" type="xsd:string" use="optional">
+				<xsd:annotation>
+					<xsd:documentation><![CDATA[ The protocol can be register to registry. ]]></xsd:documentation>
 				</xsd:annotation>
 			</xsd:attribute>
 		</xsd:complexType>
@@ -842,6 +882,11 @@
 					<xsd:attribute name="path" type="xsd:string" use="optional">
 						<xsd:annotation>
 							<xsd:documentation><![CDATA[ The service path. ]]></xsd:documentation>
+						</xsd:annotation>
+					</xsd:attribute>
+					<xsd:attribute name="register" type="xsd:string" use="optional">
+						<xsd:annotation>
+							<xsd:documentation><![CDATA[ The service can be register to registry. ]]></xsd:documentation>
 						</xsd:annotation>
 					</xsd:attribute>
 					<xsd:attribute name="provider" type="xsd:string" use="optional">

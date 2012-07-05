@@ -30,9 +30,9 @@ import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.rpc.Exporter;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
+import com.alibaba.dubbo.rpc.ProxyFactory;
 import com.alibaba.dubbo.rpc.RpcConstants;
 import com.alibaba.dubbo.rpc.RpcException;
-import com.alibaba.dubbo.rpc.proxy.ProxyFactory;
 import com.alibaba.dubbo.rpc.service.GenericService;
 
 /**
@@ -57,8 +57,8 @@ public class StubProxyFactoryWrapper implements ProxyFactory {
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public <T> T getProxy(Invoker<T> invoker, Class<?>... types) throws RpcException {
-        T proxy = proxyFactory.getProxy(invoker, types);
+    public <T> T getProxy(Invoker<T> invoker) throws RpcException {
+        T proxy = proxyFactory.getProxy(invoker);
         if (GenericService.class != invoker.getInterface()) {
             String stub = invoker.getUrl().getParameter(Constants.STUB_KEY, invoker.getUrl().getParameter(Constants.LOCAL_KEY));
             if (ConfigUtils.isNotEmpty(stub)) {
@@ -80,7 +80,7 @@ public class StubProxyFactoryWrapper implements ProxyFactory {
                         proxy = (T) constructor.newInstance(new Object[] {proxy});
                         //export stub service
                         URL url = invoker.getUrl();
-                        if (url.getBooleanParameter(RpcConstants.STUB_EVENT_KEY, RpcConstants.DEFAULT_STUB_EVENT)){
+                        if (url.getParameter(RpcConstants.STUB_EVENT_KEY, RpcConstants.DEFAULT_STUB_EVENT)){
                             url = url.addParameter(RpcConstants.STUB_EVENT_METHODS_KEY, StringUtils.join(Wrapper.getWrapper(proxy.getClass()).getDeclaredMethodNames(), ","));
                             url = url.addParameter(RpcConstants.IS_SERVER_KEY, Boolean.FALSE.toString());
                             try{

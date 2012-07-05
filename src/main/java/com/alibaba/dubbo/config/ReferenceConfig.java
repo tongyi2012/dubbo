@@ -38,14 +38,13 @@ import com.alibaba.dubbo.common.utils.ReflectUtils;
 import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
+import com.alibaba.dubbo.rpc.ProxyFactory;
 import com.alibaba.dubbo.rpc.RpcConstants;
 import com.alibaba.dubbo.rpc.StaticContext;
 import com.alibaba.dubbo.rpc.cluster.Cluster;
 import com.alibaba.dubbo.rpc.cluster.directory.StaticDirectory;
 import com.alibaba.dubbo.rpc.cluster.support.AvailableCluster;
 import com.alibaba.dubbo.rpc.cluster.support.ClusterUtils;
-import com.alibaba.dubbo.rpc.injvm.InjvmProtocol;
-import com.alibaba.dubbo.rpc.proxy.ProxyFactory;
 import com.alibaba.dubbo.rpc.service.GenericService;
 
 /**
@@ -106,8 +105,11 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
     }
     
     public synchronized void destroy() {
+        if (ref == null) {
+            throw new IllegalStateException("Uninitialized.");
+        }
         if (destroyed){
-            throw new IllegalStateException("Already destroyed!");
+            return;
         }
         destroyed = true;
         try {
@@ -191,6 +193,17 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
             if (registries == null) {
                 registries = consumer.getRegistries();
             }
+            if (monitor == null) {
+                monitor = consumer.getMonitor();
+            }
+        }
+        if (application != null) {
+            if (registries == null) {
+                registries = application.getRegistries();
+            }
+            if (monitor == null) {
+                monitor = application.getMonitor();
+            }
         }
         checkApplication();
         Map<String, String> map = new HashMap<String, String>();
@@ -257,7 +270,7 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
             j = consumer.isInjvm();
         }
         if (j != null && j) {
-            URL url = new URL(InjvmProtocol.NAME, NetUtils.LOCALHOST, InjvmProtocol.DEFAULT_PORT, interfaceClass.getName()).addParameters(map);
+            URL url = new URL("injvm", NetUtils.LOCALHOST, 0, interfaceClass.getName()).addParameters(map);
             invoker = protocol.refer(interfaceClass, url);
             if (logger.isInfoEnabled()) {
                 logger.info("Using injvm service " + interfaceClass.getName());
@@ -283,9 +296,9 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
             	List<URL> us = loadRegistries();
             	if (us != null && us.size() > 0) {
                 	for (URL u : us) {
-                	    String monitor = convertMonitor(map.get(Constants.MONITOR_KEY), u);
-                        if (monitor != null && monitor.length() > 0) {
-                            map.put(Constants.MONITOR_KEY, monitor);
+                	    URL monitorUrl = loadMonitor(u);
+                        if (monitorUrl != null) {
+                            map.put(Constants.MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
                         }
                 	    urls.add(u.addParameterAndEncoded(RpcConstants.REFER_KEY, StringUtils.toQueryString(map)));
                     }
@@ -410,7 +423,23 @@ public class ReferenceConfig<T> extends AbstractConsumerConfig {
     }
 
 	public Class<?> getInterfaceClass() {
-		return interfaceClass == null ? GenericService.class : interfaceClass;
+	    if (interfaceClass != null) {
+	        return interfaceClass;
+	    }
+	    if ((generic != null && generic.booleanValue())
+	            || (consumer != null && consumer.isGeneric() != null 
+	                && consumer.isGeneric().booleanValue())) {
+	        return GenericService.class;
+	    }
+	    try {
+	        if (interfaceName != null && interfaceName.length() > 0) {
+	            this.interfaceClass = Class.forName(interfaceName, true, Thread.currentThread()
+                    .getContextClassLoader());
+	        }
+        } catch (ClassNotFoundException t) {
+            throw new IllegalStateException(t.getMessage(), t);
+        }
+	    return interfaceClass;
 	}
 	
 	/**

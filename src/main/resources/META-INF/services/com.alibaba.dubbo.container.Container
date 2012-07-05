@@ -1,1 +1,3 @@
-com.alibaba.dubbo.container.standalone.StandaloneContainer
+com.alibaba.dubbo.container.spring.SpringContainer
+com.alibaba.dubbo.container.jetty.JettyContainer
+com.alibaba.dubbo.container.log4j.Log4jContainer

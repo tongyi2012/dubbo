@@ -78,7 +78,7 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 if (logger.isInfoEnabled()) {
                     logger.info("The service ready on spring started. service: " + getInterface());
                 }
-                ready();
+                export();
             }
         }
     }
@@ -124,8 +124,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 setApplication(applicationConfig);
             }
         }
-        if (getRegistries() == null || getRegistries().size() == 0
-                && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().size() == 0)) {
+        if ((getRegistries() == null || getRegistries().size() == 0)
+                && (getProvider() == null || getProvider().getRegistries() == null || getProvider().getRegistries().size() == 0)
+                && (getApplication() == null || getApplication().getRegistries() == null || getApplication().getRegistries().size() == 0)) {
             Map<String, RegistryConfig> registryConfigMap = applicationContext == null ? null : applicationContext.getBeansOfType(RegistryConfig.class, false, false);
             if (registryConfigMap != null && registryConfigMap.size() > 0) {
                 Collection<RegistryConfig> registryConfigs = registryConfigMap.values();
@@ -135,24 +136,26 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
             }
         }
         if (getMonitor() == null
-                && (getProvider() == null || getProvider().getMonitor() == null)) {
+                && (getProvider() == null || getProvider().getMonitor() == null)
+                && (getApplication() == null || getApplication().getMonitor() == null)) {
             Map<String, MonitorConfig> monitorConfigMap = applicationContext == null ? null : applicationContext.getBeansOfType(MonitorConfig.class, false, false);
             if (monitorConfigMap != null && monitorConfigMap.size() > 0) {
                 if (monitorConfigMap.size() > 1) {
                     throw new IllegalStateException("Duplicate monitor configs: " + monitorConfigMap.values());
                 }
                 MonitorConfig monitorConfig = monitorConfigMap.values().iterator().next();
-                super.setMonitor(monitorConfig.getAddress());
+                super.setMonitor(monitorConfig);
             }
         }
         if ((getProtocols() == null || getProtocols().size() == 0)
                 && (getProvider() == null || getProvider().getProtocols() == null || getProvider().getProtocols().size() == 0)) {
             Map<String, ProtocolConfig> protocolConfigMap = applicationContext == null ? null  : applicationContext.getBeansOfType(ProtocolConfig.class, false, false);
             if (protocolConfigMap != null && protocolConfigMap.size() > 0) {
-                Collection<ProtocolConfig> protocolConfigs = protocolConfigMap.values();
-                if (protocolConfigs != null && protocolConfigs.size() > 0) {
-                    setProtocols(new ArrayList<ProtocolConfig>(protocolConfigs));
+                if (protocolConfigMap.size() > 1) {
+                    throw new IllegalStateException("Found multi-protocols: " + protocolConfigMap.values() + ", You must be set default protocol in: <dubbo:provider protocol=\"dubbo\" />, or set service protocol in: <dubbo:service protocol=\"dubbo\" />");
                 }
+                ProtocolConfig protocolConfig = protocolConfigMap.values().iterator().next();
+                setProtocol(protocolConfig);
             }
         }
         if (getPath() == null || getPath().length() == 0) {
@@ -162,12 +165,9 @@ public class ServiceBean<T> extends ServiceConfig<T> implements InitializingBean
                 setPath(beanName);
             }
         }
-	    Integer delay = getDelay();
-	    ProviderConfig provider = getProvider();
-	    if (delay == null && provider != null) {
-	        delay = provider.getDelay();
-	    }
-	    export(! isDelay());
+        if (! isDelay()) {
+            export();
+        }
     }
 
 }

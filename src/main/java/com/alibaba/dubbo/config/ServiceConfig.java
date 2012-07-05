@@ -39,9 +39,8 @@ import com.alibaba.dubbo.common.utils.StringUtils;
 import com.alibaba.dubbo.rpc.Exporter;
 import com.alibaba.dubbo.rpc.Invoker;
 import com.alibaba.dubbo.rpc.Protocol;
+import com.alibaba.dubbo.rpc.ProxyFactory;
 import com.alibaba.dubbo.rpc.RpcConstants;
-import com.alibaba.dubbo.rpc.RpcStatus;
-import com.alibaba.dubbo.rpc.proxy.ProxyFactory;
 import com.alibaba.dubbo.rpc.service.GenericService;
 
 /**
@@ -67,6 +66,9 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     // 服务名称
     private String              path;
+    
+    // 是否注册
+    private Boolean             register;
 
     // 方法配置
     private List<MethodConfig>  methods;
@@ -88,31 +90,25 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
     
     public synchronized void export() {
-        export(true);
-    }
-    
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    protected synchronized void ready() {
-        for (URL url : urls) {
-            RpcStatus.getStatus(url).setReady(true);
-        }
-        List<URL> registryURLs = loadRegistries();
-        if (registryURLs != null && registryURLs.size() > 0) {
-            for (URL url : urls) {
-                String providerURL = url.addParameter("enabled", "true").toFullString();
-                for (URL registryURL : registryURLs) {
-                    if (logger.isInfoEnabled()) {
-                        logger.info("Register dubbo service " + interfaceClass.getName() + " url " + providerURL + " to registry " + registryURL);
+        if (delay != null && delay > 0) {
+            Thread thread = new Thread(new Runnable() {
+                public void run() {
+                    try {
+                        Thread.sleep(delay);
+                    } catch (Throwable e) {
                     }
-                    Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(RpcConstants.EXPORT_KEY, providerURL));
-                    Exporter<?> exporter = protocol.export(invoker);
-                    exporters.add(exporter);
+                    doExport();
                 }
-            }
+            });
+            thread.setDaemon(true);
+            thread.setName("DelayExportServiceThread");
+            thread.start();
+        } else {
+            doExport();
         }
     }
     
-    protected synchronized void export(boolean ready) {
+    protected synchronized void doExport() {
         if (unexported) {
             throw new IllegalStateException("Already unexported!");
         }
@@ -129,8 +125,19 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             if (registries == null) {
                 registries = provider.getRegistries();
             }
+            if (monitor == null) {
+                monitor = provider.getMonitor();
+            }
             if (protocols == null) {
                 protocols = provider.getProtocols();
+            }
+        }
+        if (application != null) {
+            if (registries == null) {
+                registries = application.getRegistries();
+            }
+            if (monitor == null) {
+                monitor = application.getMonitor();
             }
         }
         if (ref instanceof GenericService) {
@@ -181,25 +188,6 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             path = interfaceName;
         }
         doExportUrls();
-        boolean r = (ready && (delay == null || delay <= 0));
-        for (URL url : urls) {
-            RpcStatus.getStatus(url).setReady(r);
-        }
-        doExport(r);
-        if (delay != null && delay > 0) {
-            Thread thread = new Thread(new Runnable() {
-                public void run() {
-                    try {
-                        Thread.sleep(delay);
-                    } catch (Throwable e) {
-                    }
-                    ready();
-                }
-            });
-            thread.setDaemon(true);
-            thread.setName("DelayExportServiceThread");
-            thread.start();
-        }
         exported = true;
     }
 
@@ -262,10 +250,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void unexport() {
-        if (unexported) {
-            throw new IllegalStateException("Already unexported!");
+        if (!exported) {
+            throw new IllegalStateException("No exported!");
         }
-        unexported = true;
+        if (unexported) {
+            return;
+        }
     	if (exporters != null && exporters.size() > 0) {
     		for (Exporter<?> exporter : exporters) {
     			try {
@@ -276,9 +266,12 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     		}
     		exporters.clear();
     	}
+        unexported = true;
     }
     
+    @SuppressWarnings({ "unchecked", "rawtypes" })
     private void doExportUrls() {
+        List<URL> registryURLs = loadRegistries();
         for (ProtocolConfig protocolConfig : protocols) {
             String name = protocolConfig.getName();
             if (name == null || name.length() == 0) {
@@ -297,7 +290,6 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                     logger.warn(e.getMessage(), e);
                 }
                 if (NetUtils.isInvalidLocalHost(host)) {
-                    List<URL> registryURLs = loadRegistries();
                     if (registryURLs != null && registryURLs.size() > 0) {
                         for (URL registryURL : registryURLs) {
                             try {
@@ -388,8 +380,8 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 }
             }
             if (generic) {
-                map.put("generic", "true");
-                map.put("methods", "*");
+                map.put("generic", String.valueOf(true));
+                map.put("methods", Constants.ANY_VALUE);
             } else {
                 map.put("revision", Version.getVersion(interfaceClass, version));
                 map.put("methods", StringUtils.join(new HashSet<String>(Arrays.asList(Wrapper.getWrapper(interfaceClass).getDeclaredMethodNames())), ","));
@@ -402,6 +394,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 }
             }
             if ("injvm".equals(protocolConfig.getName())) {
+                protocolConfig.setRegister(false);
                 map.put("notify", "false");
             }
             // 导出服务
@@ -410,21 +403,17 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 contextPath = provider.getContextpath();
             }
             URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
-            this.urls.add(url);
-        }
-    }
-    
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-    private void doExport(boolean ready) {
-        List<URL> registryURLs = loadRegistries();
-        for (URL url : urls) {
             if (logger.isInfoEnabled()) {
                 logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
             }
-            if (registryURLs != null && registryURLs.size() > 0) {
+            if (registryURLs != null && registryURLs.size() > 0
+                    && url.getParameter("register", true)) {
                 for (URL registryURL : registryURLs) {
-                    String providerURL = url.addParameter("enabled", String.valueOf(ready)).addParameter(Constants.MONITOR_KEY, 
-                                    convertMonitor(url.getParameter(Constants.MONITOR_KEY), registryURL)).toFullString();
+                    URL monitorUrl = loadMonitor(registryURL);
+                    if (monitorUrl != null) {
+                        url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());
+                    }
+                    String providerURL = url.toFullString();
                     if (logger.isInfoEnabled()) {
                         logger.info("Register dubbo service " + interfaceClass.getName() + " url " + providerURL + " to registry " + registryURL);
                     }
@@ -437,6 +426,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
                 Exporter<?> exporter = protocol.export(invoker);
                 exporters.add(exporter);
             }
+            this.urls.add(url);
         }
     }
 
@@ -515,6 +505,17 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         this.path = path;
     }
 
+    public Boolean isRegister() {
+        return register;
+    }
+    
+    public void setRegister(Boolean register) {
+        this.register = register;
+        if (Boolean.FALSE.equals(register)) {
+            setRegistry(new RegistryConfig(RegistryConfig.NO_AVAILABLE));
+        }
+    }
+    
 	public List<MethodConfig> getMethods() {
 		return methods;
 	}

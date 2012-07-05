@@ -15,6 +15,9 @@
  */
 package com.alibaba.dubbo.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.alibaba.dubbo.common.Constants;
 
 
@@ -42,8 +45,11 @@ public class ApplicationConfig extends AbstractConfig {
     // 环境，如：dev/test/run
     private String            environment;
 
+    // 注册中心
+    protected List<RegistryConfig> registries;
+    
     // 服务监控
-    protected String          monitor;
+    private MonitorConfig     monitor;
     
     public ApplicationConfig() {
     }
@@ -103,44 +109,35 @@ public class ApplicationConfig extends AbstractConfig {
 		this.environment = environment;
 	}
 
-    public String getMonitor() {
+    public RegistryConfig getRegistry() {
+        return registries == null || registries.size() == 0 ? null : registries.get(0);
+    }
+
+    public void setRegistry(RegistryConfig registry) {
+        List<RegistryConfig> registries = new ArrayList<RegistryConfig>(1);
+        registries.add(registry);
+        this.registries = registries;
+    }
+
+    public List<RegistryConfig> getRegistries() {
+        return registries;
+    }
+
+    @SuppressWarnings({ "unchecked" })
+    public void setRegistries(List<? extends RegistryConfig> registries) {
+        this.registries = (List<RegistryConfig>)registries;
+    }
+
+    public MonitorConfig getMonitor() {
         return monitor;
     }
 
-    public void setMonitor(String monitor) {
+    public void setMonitor(MonitorConfig monitor) {
         this.monitor = monitor;
     }
 
-	@Override
-	public String toString() {
-		StringBuilder buf = new StringBuilder("<dubbo:application");
-		if (name != null && name.length() > 0) {
-			buf.append(" name=\"");
-			buf.append(name);
-			buf.append("\"");
-		}
-		if (owner != null && owner.length() > 0) {
-            buf.append(" owner=\"");
-            buf.append(owner);
-            buf.append("\"");
-        }
-		if (organization != null && organization.length() > 0) {
-			buf.append(" organization=\"");
-			buf.append(organization);
-			buf.append("\"");
-		}
-		if (architecture != null && architecture.length() > 0) {
-		    buf.append(" architecture=\"");
-		    buf.append(architecture);
-		    buf.append("\"");
-		}
-		if (environment != null && environment.length() > 0) {
-			buf.append(" environment=\"");
-			buf.append(environment);
-			buf.append("\"");
-		}
-		buf.append(" />");
-		return buf.toString();
-	}
+    public void setMonitor(String monitor) {
+        this.monitor = new MonitorConfig(monitor);
+    }
 
 }
